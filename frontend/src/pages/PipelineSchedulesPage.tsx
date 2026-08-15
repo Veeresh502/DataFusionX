@@ -113,15 +113,28 @@ export const PipelineSchedulesPage: React.FC = () => {
     return () => clearTimeout(timer);
   }, [cronExpr, timezone]);
 
-  const handleOpenCreateModal = () => {
+  const handleOpenCreateModal = async () => {
     setEditingSchedule(null);
     setName('');
-    if (pipelines.length > 0) setPipelineId(pipelines[0].id);
     setCronExpr('0 9 * * *');
     setTimezone('UTC');
     setEnabled(true);
+    
+    try {
+      const pipeList = await pipelineService.listPipelines();
+      setPipelines(pipeList);
+      if (pipeList.length > 0) {
+        setPipelineId(pipeList[0].id);
+      } else {
+        setPipelineId('');
+      }
+    } catch (err) {
+      console.error('Failed to load pipelines', err);
+    }
+    
     setShowModal(true);
   };
+
 
   const handleOpenEditModal = (sched: PipelineSchedule) => {
     setEditingSchedule(sched);
@@ -381,15 +394,20 @@ export const PipelineSchedulesPage: React.FC = () => {
                   <select
                     disabled={!!editingSchedule}
                     value={pipelineId}
-                    onChange={(e) => setPipelineId(Number(e.target.value))}
+                    onChange={(e) => setPipelineId(e.target.value ? Number(e.target.value) : '')}
                     className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-indigo-500 disabled:opacity-50"
                   >
-                    {pipelines.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} (Target: {p.destination_config?.table_name || p.destination_config?.warehouse_model_slug})
-                      </option>
-                    ))}
+                    {pipelines.length === 0 ? (
+                      <option value="">No pipelines available. Create a pipeline first.</option>
+                    ) : (
+                      pipelines.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} (Target: {p.destination_config?.table_name || p.destination_config?.warehouse_model_slug || p.destination_config?.destination_type || 'Table'})
+                        </option>
+                      ))
+                    )}
                   </select>
+
                 </div>
 
                 {/* Cron Presets */}

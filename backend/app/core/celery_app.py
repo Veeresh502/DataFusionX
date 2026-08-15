@@ -5,7 +5,9 @@ celery_app = Celery(
     "datafusionx",
     broker=settings.CELERY_BROKER_URL,
     backend=settings.CELERY_RESULT_BACKEND,
+    include=["app.tasks.pipeline_tasks", "app.tasks.schedule_tasks"]
 )
+
 
 celery_app.conf.update(
     task_serializer="json",

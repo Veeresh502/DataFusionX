@@ -20,35 +20,44 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.create_table(
-        'pipeline_schedules',
-        sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
-        sa.Column('organization_id', sa.Integer(), nullable=False),
-        sa.Column('pipeline_id', sa.Integer(), nullable=False),
-        sa.Column('name', sa.String(), nullable=False),
-        sa.Column('cron_expression', sa.String(), nullable=False),
-        sa.Column('timezone', sa.String(), nullable=False, server_default='UTC'),
-        sa.Column('enabled', sa.Boolean(), nullable=False, server_default='true'),
-        sa.Column('next_run_at', sa.DateTime(timezone=True), nullable=True),
-        sa.Column('last_run_at', sa.DateTime(timezone=True), nullable=True),
-        sa.Column('created_by', sa.Integer(), nullable=True),
-        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-        sa.ForeignKeyConstraint(['created_by'], ['users.id'], ondelete='SET NULL'),
-        sa.ForeignKeyConstraint(['organization_id'], ['organizations.id'], ondelete='CASCADE'),
-        sa.ForeignKeyConstraint(['pipeline_id'], ['pipelines.id'], ondelete='CASCADE'),
-        sa.PrimaryKeyConstraint('id')
-    )
-    op.create_index(op.f('ix_pipeline_schedules_enabled'), 'pipeline_schedules', ['enabled'], unique=False)
-    op.create_index(op.f('ix_pipeline_schedules_id'), 'pipeline_schedules', ['id'], unique=False)
-    op.create_index(op.f('ix_pipeline_schedules_next_run_at'), 'pipeline_schedules', ['next_run_at'], unique=False)
-    op.create_index(op.f('ix_pipeline_schedules_organization_id'), 'pipeline_schedules', ['organization_id'], unique=False)
-    op.create_index(op.f('ix_pipeline_schedules_pipeline_id'), 'pipeline_schedules', ['pipeline_id'], unique=False)
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
 
-    op.add_column('pipeline_executions', sa.Column('trigger_type', sa.String(), server_default='MANUAL', nullable=False))
-    op.add_column('pipeline_executions', sa.Column('schedule_id', sa.Integer(), nullable=True))
-    op.create_foreign_key('fk_pipeline_executions_schedule_id', 'pipeline_executions', 'pipeline_schedules', ['schedule_id'], ['id'], ondelete='SET NULL')
-    op.create_index(op.f('ix_pipeline_executions_schedule_id'), 'pipeline_executions', ['schedule_id'], unique=False)
+    if not inspector.has_table('pipeline_schedules'):
+        op.create_table(
+            'pipeline_schedules',
+            sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
+            sa.Column('organization_id', sa.Integer(), nullable=False),
+            sa.Column('pipeline_id', sa.Integer(), nullable=False),
+            sa.Column('name', sa.String(), nullable=False),
+            sa.Column('cron_expression', sa.String(), nullable=False),
+            sa.Column('timezone', sa.String(), nullable=False, server_default='UTC'),
+            sa.Column('enabled', sa.Boolean(), nullable=False, server_default='true'),
+            sa.Column('next_run_at', sa.DateTime(timezone=True), nullable=True),
+            sa.Column('last_run_at', sa.DateTime(timezone=True), nullable=True),
+            sa.Column('created_by', sa.Integer(), nullable=True),
+            sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+            sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+            sa.ForeignKeyConstraint(['created_by'], ['users.id'], ondelete='SET NULL'),
+            sa.ForeignKeyConstraint(['organization_id'], ['organizations.id'], ondelete='CASCADE'),
+            sa.ForeignKeyConstraint(['pipeline_id'], ['pipelines.id'], ondelete='CASCADE'),
+            sa.PrimaryKeyConstraint('id')
+        )
+        op.create_index(op.f('ix_pipeline_schedules_enabled'), 'pipeline_schedules', ['enabled'], unique=False)
+        op.create_index(op.f('ix_pipeline_schedules_id'), 'pipeline_schedules', ['id'], unique=False)
+        op.create_index(op.f('ix_pipeline_schedules_next_run_at'), 'pipeline_schedules', ['next_run_at'], unique=False)
+        op.create_index(op.f('ix_pipeline_schedules_organization_id'), 'pipeline_schedules', ['organization_id'], unique=False)
+        op.create_index(op.f('ix_pipeline_schedules_pipeline_id'), 'pipeline_schedules', ['pipeline_id'], unique=False)
+
+    exec_cols = {c['name'] for c in inspector.get_columns('pipeline_executions')}
+    if 'trigger_type' not in exec_cols:
+        op.add_column('pipeline_executions', sa.Column('trigger_type', sa.String(), server_default='MANUAL', nullable=False))
+
+    if 'schedule_id' not in exec_cols:
+        op.add_column('pipeline_executions', sa.Column('schedule_id', sa.Integer(), nullable=True))
+        op.create_foreign_key('fk_pipeline_executions_schedule_id', 'pipeline_executions', 'pipeline_schedules', ['schedule_id'], ['id'], ondelete='SET NULL')
+        op.create_index(op.f('ix_pipeline_executions_schedule_id'), 'pipeline_executions', ['schedule_id'], unique=False)
+
 
 
 def downgrade() -> None:

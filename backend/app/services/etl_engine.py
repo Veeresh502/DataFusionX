@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Tuple, Optional
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, inspect
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -12,6 +12,7 @@ from app.models.data_source import DataSource
 from app.models.pipeline import Pipeline
 from app.models.pipeline_execution import PipelineExecution
 from app.core.encryption import decrypt_credentials
+
 
 
 def _utc_now_iso() -> str:
@@ -284,10 +285,38 @@ def load_data_to_postgres(df: pd.DataFrame, dest_config: Dict[str, Any], logger:
         logger.info(f"Load started: Flat target table '{table_name}' (mode: {if_exists})")
         db_url = settings.DATABASE_URL
         engine = create_engine(db_url)
-        df.to_sql(name=table_name, con=engine, if_exists=if_exists, index=False)
+
+        # Inspect target table for safe replacement or automatic column addition
+        with engine.begin() as conn:
+            inspector = inspect(conn)
+            table_exists = inspector.has_table(table_name)
+            
+            if table_exists:
+                if if_exists == "replace":
+                    conn.execute(text(f'DROP TABLE IF EXISTS "{table_name}" CASCADE'))
+                    logger.info(f"Existing table '{table_name}' dropped (replace mode)")
+                elif if_exists == "append":
+                    existing_cols = {c["name"] for c in inspector.get_columns(table_name)}
+                    for col in df.columns:
+                        if col not in existing_cols:
+                            sql_type = "VARCHAR"
+                            if pd.api.types.is_integer_dtype(df[col]):
+                                sql_type = "INTEGER"
+                            elif pd.api.types.is_float_dtype(df[col]):
+                                sql_type = "DOUBLE PRECISION"
+                            elif pd.api.types.is_datetime64_any_dtype(df[col]):
+                                sql_type = "TIMESTAMP WITH TIME ZONE"
+                            elif pd.api.types.is_bool_dtype(df[col]):
+                                sql_type = "BOOLEAN"
+                            
+                            conn.execute(text(f'ALTER TABLE "{table_name}" ADD COLUMN IF NOT EXISTS "{col}" {sql_type}'))
+                            logger.info(f"Auto-added column '{col}' ({sql_type}) to target table '{table_name}'")
+
+        df.to_sql(name=table_name, con=engine, if_exists=if_exists if if_exists != "replace" else "append", index=False)
         loaded_count = len(df)
         logger.info(f"Load completed: {loaded_count} records written to '{table_name}' table")
         return loaded_count
+
 
 
 # --- ETL EXECUTION ENGINE MANAGER ---
