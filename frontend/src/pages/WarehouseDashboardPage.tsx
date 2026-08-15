@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MainLayout } from '../layouts/MainLayout';
+import { useToast } from '../components/Toast';
+import { ConfirmModal } from '../components/ConfirmModal';
 import { warehouseService } from '../services/api';
+
 import {
   WarehouseModel,
   WarehouseTableSummary,
@@ -36,6 +39,7 @@ import {
 } from 'lucide-react';
 
 export const WarehouseDashboardPage: React.FC = () => {
+  const toast = useToast();
   const navigate = useNavigate();
   const [models, setModels] = useState<WarehouseModel[]>([]);
   const [selectedModelSlug, setSelectedModelSlug] = useState<string>('sales');
@@ -45,6 +49,7 @@ export const WarehouseDashboardPage: React.FC = () => {
   const [genericAnalytics, setGenericAnalytics] = useState<GenericWarehouseAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
   const [seeding, setSeeding] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   useEffect(() => {
     fetchModels();
@@ -117,31 +122,31 @@ export const WarehouseDashboardPage: React.FC = () => {
   };
 
   const handleSeedSample = async () => {
+
     setSeeding(true);
     try {
       if (activeModel.domain === 'MANUFACTURING') {
         const res = await warehouseService.seedSampleManufacturing();
-        alert(`Successfully loaded ${res.inserted_facts} sample manufacturing batch run records!`);
+        toast.success('Sample Data Loaded', `Loaded ${res.inserted_facts} sample manufacturing batch records.`);
       } else {
         const res = await warehouseService.seedSampleSales();
-        alert(`Successfully loaded ${res.inserted_facts} sample sales records into Kimball Star Schema!`);
+        toast.success('Sample Data Loaded', `Loaded ${res.inserted_facts} sample sales records into Kimball Star Schema.`);
       }
       await fetchModelData(selectedModelSlug);
     } catch (err: any) {
-      alert(err.response?.data?.detail || 'Failed to seed sample data');
+      toast.error('Seed Failed', err.response?.data?.detail || 'Failed to seed sample data');
     } finally {
       setSeeding(false);
     }
   };
 
   const handleResetWarehouse = async () => {
+    setShowResetConfirm(true);
+  };
+
+  const executeResetWarehouse = async () => {
     const isMfg = activeModel.domain === 'MANUFACTURING';
-    const confirmMsg = isMfg
-      ? 'Reset/Clear all Manufacturing Star Schema tables (fact_production, dim_machine, dim_plant)?'
-      : 'Reset/Clear all Sales Star Schema tables (fact_sales, dim_customer, dim_product, dim_location)?';
-
-    if (!window.confirm(confirmMsg)) return;
-
+    setShowResetConfirm(false);
     setLoading(true);
     try {
       if (isMfg) {
@@ -149,10 +154,10 @@ export const WarehouseDashboardPage: React.FC = () => {
       } else {
         await warehouseService.resetWarehouseData();
       }
-      alert('Warehouse model data cleared successfully!');
+      toast.success('Warehouse Cleared', 'Warehouse model data cleared successfully.');
       await fetchModelData(selectedModelSlug);
     } catch (err: any) {
-      alert(err.response?.data?.detail || 'Failed to reset warehouse data');
+      toast.error('Reset Failed', err.response?.data?.detail || 'Failed to reset warehouse data');
     } finally {
       setLoading(false);
     }
@@ -513,7 +518,19 @@ export const WarehouseDashboardPage: React.FC = () => {
             })}
           </div>
         </div>
+
+        <ConfirmModal
+          isOpen={showResetConfirm}
+          title="Reset Warehouse Model"
+          message={`Are you sure you want to clear/reset all ${activeModel.name} tables? All fact and dimension records will be deleted.`}
+          confirmText="Clear Warehouse Data"
+          cancelText="Cancel"
+          type="danger"
+          onConfirm={executeResetWarehouse}
+          onCancel={() => setShowResetConfirm(false)}
+        />
       </div>
     </MainLayout>
   );
 };
+

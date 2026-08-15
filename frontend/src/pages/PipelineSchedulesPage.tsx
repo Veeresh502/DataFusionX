@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { MainLayout } from '../layouts/MainLayout';
+import { useToast } from '../components/Toast';
+import { ConfirmModal } from '../components/ConfirmModal';
+
+
 import { scheduleService, pipelineService } from '../services/api';
 import { PipelineSchedule, Pipeline, CronValidationResponse } from '../types';
 import {
@@ -42,6 +46,7 @@ const CRON_PRESETS = [
 ];
 
 export const PipelineSchedulesPage: React.FC = () => {
+  const toast = useToast();
   const [schedules, setSchedules] = useState<PipelineSchedule[]>([]);
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,6 +63,10 @@ export const PipelineSchedulesPage: React.FC = () => {
   const [timezone, setTimezone] = useState('UTC');
   const [enabled, setEnabled] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  // Confirm Modal Delete State
+  const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
 
   // Live Validation Preview State
   const [validation, setValidation] = useState<CronValidationResponse | null>(null);
@@ -75,7 +84,6 @@ export const PipelineSchedulesPage: React.FC = () => {
         pipelineService.listPipelines(),
       ]);
       setSchedules(schedList);
-
       setPipelines(pipeList);
       if (pipeList.length > 0 && !pipelineId) {
         setPipelineId(pipeList[0].id);
@@ -119,6 +127,7 @@ export const PipelineSchedulesPage: React.FC = () => {
     setCronExpr('0 9 * * *');
     setTimezone('UTC');
     setEnabled(true);
+    setFormError(null);
     
     try {
       const pipeList = await pipelineService.listPipelines();
@@ -135,7 +144,6 @@ export const PipelineSchedulesPage: React.FC = () => {
     setShowModal(true);
   };
 
-
   const handleOpenEditModal = (sched: PipelineSchedule) => {
     setEditingSchedule(sched);
     setName(sched.name);
@@ -143,14 +151,19 @@ export const PipelineSchedulesPage: React.FC = () => {
     setCronExpr(sched.cron_expression);
     setTimezone(sched.timezone);
     setEnabled(sched.enabled);
+    setFormError(null);
     setShowModal(true);
   };
 
   const handleSaveSchedule = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !pipelineId || !cronExpr) return;
+    setFormError(null);
+    if (!name || !pipelineId || !cronExpr) {
+      setFormError('Please fill out all required schedule fields.');
+      return;
+    }
     if (validation && !validation.valid) {
-      alert(validation.error || 'Please fix invalid cron expression or timezone before saving.');
+      setFormError(validation.error || 'Please fix invalid cron expression or timezone before saving.');
       return;
     }
 
@@ -163,6 +176,7 @@ export const PipelineSchedulesPage: React.FC = () => {
           timezone,
           enabled,
         });
+        toast.success('Schedule Updated', `Schedule '${name}' has been updated.`);
       } else {
         await scheduleService.createSchedule({
           name,
@@ -171,11 +185,14 @@ export const PipelineSchedulesPage: React.FC = () => {
           timezone,
           enabled,
         });
+        toast.success('Schedule Created', `Schedule '${name}' has been created successfully.`);
       }
       setShowModal(false);
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.detail || 'Failed to save schedule');
+      const errMsg = err.response?.data?.detail || 'Failed to save schedule';
+      setFormError(errMsg);
+      toast.error('Schedule Error', errMsg);
     } finally {
       setSaving(false);
     }
@@ -185,24 +202,31 @@ export const PipelineSchedulesPage: React.FC = () => {
     try {
       if (sched.enabled) {
         await scheduleService.disableSchedule(sched.id);
+        toast.info('Schedule Disabled', `Schedule '${sched.name}' is now disabled.`);
       } else {
         await scheduleService.enableSchedule(sched.id);
+        toast.success('Schedule Enabled', `Schedule '${sched.name}' is now active.`);
       }
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.detail || 'Failed to toggle schedule state');
+      const errMsg = err.response?.data?.detail || 'Failed to toggle schedule state';
+      toast.error('Toggle Error', errMsg);
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('Are you sure you want to delete this schedule?')) return;
+  const handleConfirmDelete = async () => {
+    if (!deleteTargetId) return;
     try {
-      await scheduleService.deleteSchedule(id);
+      await scheduleService.deleteSchedule(deleteTargetId);
+      toast.success('Schedule Deleted', 'The schedule was removed.');
+      setDeleteTargetId(null);
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.detail || 'Failed to delete schedule');
+      const errMsg = err.response?.data?.detail || 'Failed to delete schedule';
+      toast.error('Delete Error', errMsg);
     }
   };
+
 
   const filteredSchedules = schedules.filter((s) => {
     const term = searchTerm.toLowerCase();
@@ -345,7 +369,7 @@ export const PipelineSchedulesPage: React.FC = () => {
                           </button>
 
                           <button
-                            onClick={() => handleDelete(sched.id)}
+                            onClick={() => setDeleteTargetId(sched.id)}
                             title="Delete Schedule"
                             className="p-1.5 rounded-lg bg-slate-800 border border-slate-700 text-rose-400 hover:bg-rose-950/40 transition-colors"
                           >
@@ -376,7 +400,15 @@ export const PipelineSchedulesPage: React.FC = () => {
                 {editingSchedule ? 'Edit Schedule' : 'Configure New Schedule'}
               </h3>
 
+              {formError && (
+                <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+                  <span>{formError}</span>
+                </div>
+              )}
+
               <form onSubmit={handleSaveSchedule} className="space-y-4 text-xs">
+
                 <div>
                   <label className="block font-medium text-slate-300 mb-1">Schedule Name</label>
                   <input
@@ -530,7 +562,21 @@ export const PipelineSchedulesPage: React.FC = () => {
           </div>
         )}
 
+        {/* Confirm Delete Modal */}
+        <ConfirmModal
+          isOpen={deleteTargetId !== null}
+          title="Delete Schedule"
+          message="Are you sure you want to delete this pipeline schedule? Active recurring dispatches will stop immediately."
+          confirmText="Delete Schedule"
+          cancelText="Cancel"
+          type="danger"
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setDeleteTargetId(null)}
+        />
+
+
       </div>
     </MainLayout>
   );
 };
+

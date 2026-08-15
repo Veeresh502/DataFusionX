@@ -18,13 +18,19 @@ import {
 } from 'lucide-react';
 
 
+import { useToast } from '../components/Toast';
+import { ConfirmModal } from '../components/ConfirmModal';
+
 export const PipelinesListPage: React.FC = () => {
+  const toast = useToast();
   const navigate = useNavigate();
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
   const [sources, setSources] = useState<Record<number, DataSource>>({});
   const [loading, setLoading] = useState(true);
   const [runningId, setRunningId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [deletePipelineId, setDeletePipelineId] = useState<number | null>(null);
+
 
   useEffect(() => {
     fetchPipelinesAndSources();
@@ -56,9 +62,13 @@ export const PipelinesListPage: React.FC = () => {
     setRunningId(id);
     try {
       const exec = await pipelineService.runPipeline(id);
-      alert(`Pipeline execution finished with status: ${exec.status}! Records processed: ${exec.records_processed}`);
+      if (exec.status === 'SUCCESS') {
+        toast.success('Pipeline Execution Completed', `Processed ${exec.records_processed} records successfully.`);
+      } else {
+        toast.error('Pipeline Execution Failed', `Execution status: ${exec.status}`);
+      }
     } catch (err: any) {
-      alert(err.response?.data?.detail || 'Pipeline execution failed');
+      toast.error('Execution Failed', err.response?.data?.detail || 'Pipeline execution failed');
     } finally {
       setRunningId(null);
     }
@@ -68,23 +78,30 @@ export const PipelinesListPage: React.FC = () => {
     e.stopPropagation();
     try {
       const cloned = await pipelineService.clonePipeline(id);
-      alert(`Pipeline cloned as '${cloned.name}'!`);
+      toast.success('Pipeline Cloned', `Created clone '${cloned.name}'.`);
       await fetchPipelinesAndSources();
     } catch (err: any) {
-      alert(err.response?.data?.detail || 'Failed to clone pipeline');
+      toast.error('Clone Error', err.response?.data?.detail || 'Failed to clone pipeline');
     }
   };
 
-  const handleDelete = async (id: number, e: React.MouseEvent) => {
+  const handleDeleteClick = (id: number, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!window.confirm('Delete this ETL pipeline?')) return;
+    setDeletePipelineId(id);
+  };
+
+  const handleConfirmDeletePipeline = async () => {
+    if (!deletePipelineId) return;
     try {
-      await pipelineService.deletePipeline(id);
-      setPipelines((prev) => prev.filter((p) => p.id !== id));
+      await pipelineService.deletePipeline(deletePipelineId);
+      toast.success('Pipeline Deleted', 'The ETL pipeline was removed.');
+      setPipelines((prev) => prev.filter((p) => p.id !== deletePipelineId));
+      setDeletePipelineId(null);
     } catch (err: any) {
-      alert(err.response?.data?.detail || 'Failed to delete pipeline');
+      toast.error('Delete Error', err.response?.data?.detail || 'Failed to delete pipeline');
     }
   };
+
 
   const filteredPipelines = pipelines.filter((p) =>
     p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -256,7 +273,7 @@ export const PipelinesListPage: React.FC = () => {
                             <History className="w-3.5 h-3.5" />
                           </button>
                           <button
-                            onClick={(e) => handleDelete(p.id, e)}
+                            onClick={(e) => handleDeleteClick(p.id, e)}
                             className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-900/40 text-rose-400 hover:text-rose-200 transition-colors inline-flex items-center gap-1"
                             title="Delete Pipeline"
                           >
@@ -272,6 +289,16 @@ export const PipelinesListPage: React.FC = () => {
           )}
         </div>
 
+        <ConfirmModal
+          isOpen={deletePipelineId !== null}
+          title="Delete ETL Pipeline"
+          message="Are you sure you want to delete this pipeline? All execution history will be preserved."
+          confirmText="Delete Pipeline"
+          cancelText="Cancel"
+          type="danger"
+          onConfirm={handleConfirmDeletePipeline}
+          onCancel={() => setDeletePipelineId(null)}
+        />
       </div>
     </MainLayout>
   );
