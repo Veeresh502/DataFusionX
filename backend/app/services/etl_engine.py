@@ -345,31 +345,70 @@ def run_pipeline(pipeline_id: int, db: Session) -> PipelineExecution:
             raise ValueError(f"Data source ID {pipeline.source_id} not found")
 
         # 1. EXTRACT
+        t0 = time.time()
         extracted_df = extract_data(source, logger)
+        t1 = time.time()
         execution.records_read = len(extracted_df)
+        try:
+            from app.core.prometheus import PIPELINE_STAGE_DURATION_SECONDS, PIPELINE_RECORDS_READ_TOTAL
+            PIPELINE_STAGE_DURATION_SECONDS.labels(stage="EXTRACT").observe(t1 - t0)
+            PIPELINE_RECORDS_READ_TOTAL.inc(len(extracted_df))
+        except Exception:
+            pass
 
         # 2. TRANSFORM
         steps = pipeline.steps or []
         transform_steps = [s for s in steps if s.get("category") != "validation"]
         validation_steps = [s for s in steps if s.get("category") == "validation"]
 
+        t2 = time.time()
         transformed_df = transform_dataframe(extracted_df, transform_steps, logger)
+        t3 = time.time()
+        try:
+            from app.core.prometheus import PIPELINE_STAGE_DURATION_SECONDS
+            PIPELINE_STAGE_DURATION_SECONDS.labels(stage="TRANSFORM").observe(t3 - t2)
+        except Exception:
+            pass
 
         # 3. VALIDATE
+        t4 = time.time()
         valid_df, invalid_df, validation_errors = validate_dataframe(transformed_df, validation_steps, logger)
+        t5 = time.time()
         execution.records_processed = len(valid_df)
         execution.records_failed = len(invalid_df)
+        try:
+            from app.core.prometheus import (
+                PIPELINE_STAGE_DURATION_SECONDS,
+                PIPELINE_RECORDS_PROCESSED_TOTAL,
+                PIPELINE_VALIDATION_ERRORS_TOTAL,
+                PIPELINE_INVALID_RECORDS_TOTAL
+            )
+            PIPELINE_STAGE_DURATION_SECONDS.labels(stage="VALIDATE").observe(t5 - t4)
+            PIPELINE_RECORDS_PROCESSED_TOTAL.inc(len(valid_df))
+            if validation_errors:
+                PIPELINE_VALIDATION_ERRORS_TOTAL.inc(len(validation_errors))
+            if len(invalid_df) > 0:
+                PIPELINE_INVALID_RECORDS_TOTAL.inc(len(invalid_df))
+        except Exception:
+            pass
 
         # 4. LOAD
+        t6 = time.time()
         if not valid_df.empty and pipeline.destination_config:
             loaded_count = load_data_to_postgres(valid_df, pipeline.destination_config, logger, db=db)
             execution.records_loaded = loaded_count
         else:
             execution.records_loaded = 0
             logger.info("Load skipped: No valid records to write or destination omitted")
+        t7 = time.time()
+        try:
+            from app.core.prometheus import PIPELINE_STAGE_DURATION_SECONDS, PIPELINE_RECORDS_LOADED_TOTAL
+            PIPELINE_STAGE_DURATION_SECONDS.labels(stage="LOAD").observe(t7 - t6)
+            PIPELINE_RECORDS_LOADED_TOTAL.inc(execution.records_loaded)
+        except Exception:
+            pass
 
         execution.status = "SUCCESS"
-
 
     except Exception as e:
         logger.error(f"Pipeline execution failed: {str(e)}")
@@ -379,9 +418,33 @@ def run_pipeline(pipeline_id: int, db: Session) -> PipelineExecution:
     finally:
         end_time = time.time()
         execution.completed_at = datetime.now(timezone.utc)
-        execution.duration_seconds = round(end_time - start_time, 3)
+        duration = round(end_time - start_time, 3)
+        execution.duration_seconds = duration
         execution.logs = logger.logs
         db.commit()
         db.refresh(execution)
 
+        # Update Prometheus Pipeline Execution Metrics
+        try:
+            from app.core.prometheus import (
+                PIPELINE_EXECUTIONS_TOTAL,
+                PIPELINE_EXECUTION_DURATION_SECONDS,
+                PIPELINE_FAILURES_TOTAL,
+                PIPELINE_THROUGHPUT
+            )
+            dest_type = (pipeline.destination_config or {}).get("destination_type", "POSTGRES")
+            trig_type = getattr(execution, "trigger_type", "MANUAL")
+            
+            PIPELINE_EXECUTIONS_TOTAL.labels(status=execution.status, trigger_type=trig_type, destination_type=dest_type).inc()
+            PIPELINE_EXECUTION_DURATION_SECONDS.labels(status=execution.status, trigger_type=trig_type).observe(duration)
+            
+            if execution.status == "FAILED":
+                PIPELINE_FAILURES_TOTAL.inc()
+            
+            if duration > 0 and (execution.records_processed or 0) > 0:
+                PIPELINE_THROUGHPUT.set(round(execution.records_processed / duration, 2))
+        except Exception:
+            pass
+
     return execution
+

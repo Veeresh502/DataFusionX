@@ -365,6 +365,92 @@ export interface ManufacturingMetrics {
 }
 
 
+export interface SystemHealthInfo {
+
+  overall: string;
+  api: string;
+  database: string;
+  redis: string;
+  celery: string;
+  active_schedules: number;
+  version: string;
+}
+
+export interface PipelineOverviewInfo {
+  total_executions_today: number;
+  successful_today: number;
+  failed_today: number;
+  retrying_today: number;
+  running_today: number;
+  success_rate: number;
+  average_duration_seconds: number;
+  min_duration_seconds: number;
+  max_duration_seconds: number;
+  total_records_read: number;
+  total_records_processed: number;
+  total_records_loaded: number;
+  total_failed_records: number;
+  throughput_records_per_sec: number;
+}
+
+export interface PipelineFailureItem {
+  pipeline_id: number;
+  pipeline_name: string;
+  total_executions: number;
+  failed_executions: number;
+  failure_rate_pct: number;
+  last_execution_time: string | null;
+}
+
+export interface PipelinePerformanceInfo {
+  slowest_pipelines: {
+    pipeline_id: number;
+    pipeline_name: string;
+    avg_duration: number;
+    max_duration: number;
+    executions_count: number;
+  }[];
+  highest_volume_pipelines: {
+    pipeline_id: number;
+    pipeline_name: string;
+    total_records_processed: number;
+  }[];
+  execution_timeline: {
+    execution_id: number;
+    pipeline_id: number;
+    status: string;
+    duration_seconds: number;
+    records_processed: number;
+    records_loaded: number;
+    started_at: string | null;
+  }[];
+}
+
+export interface DataQualitySummaryInfo {
+  average_quality_score: number;
+  total_profiles_analyzed: number;
+  total_quality_warnings: number;
+  total_critical_errors: number;
+  total_invalid_records: number;
+}
+
+export interface ScheduleMonitoringInfo {
+  total_schedules: number;
+  enabled_schedules: number;
+  scheduled_executions_today: number;
+  successful_scheduled_today: number;
+  failed_scheduled_today: number;
+}
+
+export interface MonitoringOverview {
+  system_health: SystemHealthInfo;
+  pipeline_overview: PipelineOverviewInfo;
+  quality_summary: DataQualitySummaryInfo;
+  schedule_summary: ScheduleMonitoringInfo;
+}
+
+
+
 
 
 

@@ -1,0 +1,182 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "title": "API Request Rate (req/sec)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "expr": "rate(http_requests_total[1m])",
+          "legendFormat": "{{method}} {{endpoint}} ({{status}})"
+        }
+      ]
+    },
+    {
+      "title": "API Request Latency (p95)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 0 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[1m])) by (le, endpoint))",
+          "legendFormat": "p95 {{endpoint}}"
+        }
+      ]
+    },
+    {
+      "title": "API Errors Total",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 0 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "expr": "HTTP_ERRORS_TOTAL or vector(0)",
+          "legendFormat": "Errors"
+        }
+      ]
+    },
+    {
+      "title": "Overall Pipeline Executions Summary",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "expr": "pipeline_exec_success_count",
+          "legendFormat": "Successful Executions"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "expr": "pipeline_exec_failed_count",
+          "legendFormat": "Failed Executions"
+        }
+      ]
+    },
+    {
+      "title": "Overall Pipeline Duration (Avg)",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "expr": "pipeline_exec_avg_duration_seconds",
+          "legendFormat": "Avg Duration (sec)"
+        }
+      ]
+    },
+
+    {
+      "title": "📊 SALES DOMAIN PIPELINE MONITORING",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
+      "collapsed": false
+    },
+    {
+      "title": "Sales Executions Successful",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 15 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "expr": "sales_exec_success_count",
+          "legendFormat": "Sales Executions"
+        }
+      ]
+    },
+    {
+      "title": "Sales Records Processed & Loaded",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 10, "x": 6, "y": 15 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "expr": "sales_records_processed_total",
+          "legendFormat": "Processed Sales Records"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "expr": "sales_records_loaded_total",
+          "legendFormat": "Loaded Fact Sales Records"
+        }
+      ]
+    },
+    {
+      "title": "Sales Pipeline Throughput (rec/sec)",
+      "type": "gauge",
+      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 15 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "expr": "sales_pipeline_throughput",
+          "legendFormat": "Sales Throughput"
+        }
+      ]
+    },
+
+    {
+      "title": "🏭 MANUFACTURING DOMAIN PIPELINE MONITORING",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 21 },
+      "collapsed": false
+    },
+    {
+      "title": "Manufacturing Executions Successful",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 22 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "expr": "manufacturing_exec_success_count",
+          "legendFormat": "Mfg Executions"
+        }
+      ]
+    },
+    {
+      "title": "Manufacturing Batch Records Processed & Loaded",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 10, "x": 6, "y": 22 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "expr": "manufacturing_records_processed_total",
+          "legendFormat": "Processed Batch Records"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "expr": "manufacturing_records_loaded_total",
+          "legendFormat": "Loaded Fact Production Records"
+        }
+      ]
+    },
+    {
+      "title": "Manufacturing Pipeline Throughput (rec/sec)",
+      "type": "gauge",
+      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 22 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "expr": "manufacturing_pipeline_throughput",
+          "legendFormat": "Mfg Throughput"
+        }
+      ]
+    }
+  ],
+  "refresh": "5s",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["datafusionx", "monitoring", "sales", "manufacturing"],
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "DataFusionX Production Monitoring",
+  "uid": "datafusionx-main",
+  "version": 4
+}

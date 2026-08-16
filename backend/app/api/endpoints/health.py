@@ -3,14 +3,15 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.schemas.health import HealthStatus, DatabaseHealthStatus
-from app.services.health import check_database_health
+from app.services.health import check_database_health, check_full_health
 
 router = APIRouter()
 
 
 @router.get("/health", response_model=HealthStatus, tags=["Health"])
-def get_health() -> HealthStatus:
-    return HealthStatus(status="healthy")
+@router.get("/api/health", response_model=HealthStatus, tags=["Health"])
+def get_health(db: Session = Depends(get_db)) -> HealthStatus:
+    return check_full_health(db)
 
 
 @router.get("/api/health/database", response_model=DatabaseHealthStatus, tags=["Health"])

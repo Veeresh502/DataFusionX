@@ -13,6 +13,8 @@ import { PipelineExecutionsPage } from './pages/PipelineExecutionsPage';
 import { WarehouseDashboardPage } from './pages/WarehouseDashboardPage';
 import { WarehouseTableDetailPage } from './pages/WarehouseTableDetailPage';
 import { PipelineSchedulesPage } from './pages/PipelineSchedulesPage';
+import { MonitoringDashboardPage } from './pages/MonitoringDashboardPage';
+
 
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -117,6 +119,15 @@ export const App: React.FC = () => {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/monitoring"
+          element={
+            <ProtectedRoute>
+              <MonitoringDashboardPage />
+            </ProtectedRoute>
+          }
+        />
+
 
         <Route
           path="/warehouse"

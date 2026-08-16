@@ -1,7 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Layers, Database, GitCommit, Server, Calendar } from 'lucide-react';
-
+import { LayoutDashboard, Layers, Database, GitCommit, Server, Calendar, Activity } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
   return (
@@ -78,6 +77,19 @@ export const Sidebar: React.FC = () => {
           <Calendar className="w-4 h-4 text-amber-400" />
           <span>Schedules</span>
         </NavLink>
+        <NavLink
+          to="/monitoring"
+          className={({ isActive }) =>
+            `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+              isActive
+                ? 'bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 shadow-inner'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+            }`
+          }
+        >
+          <Activity className="w-4 h-4 text-rose-400" />
+          <span>Monitoring</span>
+        </NavLink>
 
         <NavLink
           to="/warehouse"
@@ -93,6 +105,7 @@ export const Sidebar: React.FC = () => {
           <span>Data Warehouse</span>
         </NavLink>
       </nav>
+
 
       {/* Footer Info */}
       <div className="p-4 border-t border-slate-800/80 text-xs text-slate-500 flex items-center justify-between">

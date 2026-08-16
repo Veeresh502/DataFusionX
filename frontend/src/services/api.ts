@@ -309,6 +309,39 @@ export const scheduleService = {
   },
 };
 
+export const monitoringService = {
+  getOverview: async () => {
+    const response = await apiClient.get('/api/monitoring/overview');
+    return response.data;
+  },
+
+  getSystemHealth: async () => {
+    const response = await apiClient.get('/api/monitoring/system-health');
+    return response.data;
+  },
+
+  getFailures: async () => {
+    const response = await apiClient.get('/api/monitoring/failures');
+    return response.data;
+  },
+
+  getPerformance: async () => {
+    const response = await apiClient.get('/api/monitoring/performance');
+    return response.data;
+  },
+
+  getDataQuality: async () => {
+    const response = await apiClient.get('/api/monitoring/data-quality');
+    return response.data;
+  },
+
+  getSchedules: async () => {
+    const response = await apiClient.get('/api/monitoring/schedules');
+    return response.data;
+  },
+};
+
+
 
 
 
