@@ -13,7 +13,9 @@ import { PipelineExecutionsPage } from './pages/PipelineExecutionsPage';
 import { WarehouseDashboardPage } from './pages/WarehouseDashboardPage';
 import { WarehouseTableDetailPage } from './pages/WarehouseTableDetailPage';
 import { TransformedDatasetsPage } from './pages/TransformedDatasetsPage';
+import { AICopilotPage } from './pages/AICopilotPage';
 import { PipelineSchedulesPage } from './pages/PipelineSchedulesPage';
+
 import { MonitoringDashboardPage } from './pages/MonitoringDashboardPage';
 
 
@@ -138,6 +140,15 @@ export const App: React.FC = () => {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/ai-copilot"
+          element={
+            <ProtectedRoute>
+              <AICopilotPage />
+            </ProtectedRoute>
+          }
+        />
+
 
 
         <Route

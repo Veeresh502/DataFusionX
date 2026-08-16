@@ -21,6 +21,15 @@ class Settings(BaseSettings):
     CELERY_BROKER_URL: str = "redis://localhost:6379/0"
     CELERY_RESULT_BACKEND: str = "redis://localhost:6379/0"
 
+    # AI / LLM Integration Settings (Milestone 11)
+    LLM_PROVIDER: str = "mock"  # "openai" or "mock"
+    OPENAI_API_KEY: str = ""
+    LLM_MODEL_NAME: str = "gpt-4o-mini"
+    LLM_TEMPERATURE: float = 0.0
+    LLM_TIMEOUT: int = 30
+    LLM_MAX_TOKENS: int = 1000
+
+
 
 
 

@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { MainLayout } from '../layouts/MainLayout';
 import { pipelineService } from '../services/api';
 import { PipelineExecution, Pipeline } from '../types';
+import { PipelineFailureModal } from '../components/PipelineFailureModal';
 import { 
   ArrowLeft, 
   History, 
@@ -16,8 +17,10 @@ import {
   Activity,
   RotateCcw,
   Minimize2,
-  Maximize2
+  Maximize2,
+  Sparkles
 } from 'lucide-react';
+
 
 export const PipelineExecutionsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -25,8 +28,10 @@ export const PipelineExecutionsPage: React.FC = () => {
   const [executions, setExecutions] = useState<PipelineExecution[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedExecution, setSelectedExecution] = useState<PipelineExecution | null>(null);
+  const [explainExecutionId, setExplainExecutionId] = useState<number | null>(null);
   const [running, setRunning] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
+
 
   const socketRef = useRef<WebSocket | null>(null);
 
@@ -300,7 +305,19 @@ export const PipelineExecutionsPage: React.FC = () => {
                       <td className="py-4 px-4 text-emerald-400 font-bold">{exec.records_processed}</td>
                       <td className="py-4 px-4 text-indigo-400 font-bold">{exec.records_loaded ?? 0}</td>
                       <td className="py-4 px-4 text-rose-400">{exec.records_failed}</td>
-                      <td className="py-4 px-6 text-right">
+                      <td className="py-4 px-6 text-right flex items-center justify-end gap-2">
+                        {exec.status === 'FAILED' && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setExplainExecutionId(exec.id);
+                            }}
+                            className="px-2.5 py-1 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/30 font-sans text-xs inline-flex items-center gap-1.5 transition-colors"
+                          >
+                            <Sparkles className="w-3.5 h-3.5 text-red-400" />
+                            <span>Explain with AI</span>
+                          </button>
+                        )}
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -315,6 +332,7 @@ export const PipelineExecutionsPage: React.FC = () => {
                       </td>
                     </tr>
                   ))}
+
                 </tbody>
               </table>
             </div>
@@ -445,8 +463,16 @@ export const PipelineExecutionsPage: React.FC = () => {
           </div>
         )}
 
+        {/* Pipeline Failure Assistant AI Modal */}
+        <PipelineFailureModal
+          executionId={explainExecutionId}
+          pipelineName={pipeline?.name}
+          onClose={() => setExplainExecutionId(null)}
+        />
+
       </div>
     </MainLayout>
   );
 };
+
 

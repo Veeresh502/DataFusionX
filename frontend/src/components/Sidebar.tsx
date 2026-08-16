@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Layers, Database, GitCommit, Server, Calendar, Activity } from 'lucide-react';
+import { LayoutDashboard, Layers, Database, GitCommit, Server, Calendar, Activity, Bot } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
   return (
@@ -106,6 +106,20 @@ export const Sidebar: React.FC = () => {
         </NavLink>
 
         <NavLink
+          to="/ai-copilot"
+          className={({ isActive }) =>
+            `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+              isActive
+                ? 'bg-purple-600/20 text-purple-300 border border-purple-500/30 shadow-inner'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+            }`
+          }
+        >
+          <Bot className="w-4 h-4 text-purple-400" />
+          <span>AI Copilot</span>
+        </NavLink>
+
+        <NavLink
           to="/warehouse"
           className={({ isActive }) =>
             `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
@@ -115,10 +129,11 @@ export const Sidebar: React.FC = () => {
             }`
           }
         >
-          <Server className="w-4 h-4 text-purple-400" />
+          <Server className="w-4 h-4 text-indigo-400" />
           <span>Data Warehouse</span>
         </NavLink>
       </nav>
+
 
 
       {/* Footer Info */}

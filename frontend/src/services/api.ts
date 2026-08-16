@@ -353,6 +353,29 @@ export const monitoringService = {
   },
 };
 
+export const aiService = {
+  queryAI: async (question: string, warehouseModel: string = 'sales') => {
+    const response = await apiClient.post('/api/ai/query', {
+      question,
+      warehouse_model: warehouseModel,
+    });
+    return response.data;
+  },
+
+  explainPipelineFailure: async (executionId: number) => {
+    const response = await apiClient.post('/api/ai/explain-pipeline', {
+      execution_id: executionId,
+    });
+    return response.data;
+  },
+
+  getAIHealth: async () => {
+    const response = await apiClient.get('/api/ai/health');
+    return response.data;
+  },
+};
+
+
 
 
 
