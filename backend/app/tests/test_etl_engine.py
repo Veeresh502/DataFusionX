@@ -207,3 +207,69 @@ def test_failed_pipeline_execution(client: TestClient, etl_setup):
 
     assert exec_data["status"] == "FAILED"
     assert exec_data["error"] is not None
+
+
+def test_generic_neutral_employee_pipeline_execution(client: TestClient, etl_setup):
+    """
+    NEUTRAL GENERALIZATION TEST:
+    Ingests employee_data.csv (non-Sales, non-Manufacturing dataset), applies generic ETL,
+    validates rules, and loads to flat PostgreSQL table 'target_employee_clean'.
+    Proves that DataFusionX ETL engine is domain-independent and does not require Sales or Manufacturing fields.
+    """
+    user, org, token = etl_setup
+
+    # 1. Ingest Neutral Employee CSV Data Source
+    employee_csv = (
+        b"employee_id,employee_name,department,designation,joining_date,location,salary,employment_type\n"
+        b"EMP-101,Sarah Jenkins,Engineering,Senior Data Engineer,2023-01-15,San Francisco,145000,Full-Time\n"
+        b"EMP-102,David Miller,Product,Product Manager,2022-06-10,New York,138000,Full-Time\n"
+        b"EMP-101,Sarah Jenkins,Engineering,Senior Data Engineer,2023-01-15,San Francisco,145000,Full-Time\n"
+        b"EMP-103,Elena Rostova,Data Science,Lead ML Engineer,2021-11-01,London,155000,Full-Time\n"
+    )
+
+    upload_res = client.post(
+        "/api/sources/upload",
+        headers={"Authorization": f"Bearer {token}"},
+        files={"file": ("employee_data.csv", io.BytesIO(employee_csv), "text/csv")},
+        data={"name": "Employee Master Dataset", "description": "HR & Engineering Employee Master Records"}
+    )
+    assert upload_res.status_code == 201
+    source_id = upload_res.json()["id"]
+
+    # 2. Create Generic ETL Pipeline
+    pipeline_res = client.post(
+        "/api/pipelines",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "name": "Employee Data Cleaning Pipeline",
+            "description": "Deduplicates employee records, validates salary range, and loads to PostgreSQL flat table",
+            "source_id": source_id,
+            "steps": [
+                {"type": "remove_duplicates", "subset": ["employee_id"]},
+                {"type": "trim_text", "columns": ["employee_name", "department"]},
+                {"category": "validation", "rule_type": "NOT_NULL", "column": "employee_id"},
+                {"category": "validation", "rule_type": "RANGE", "column": "salary", "min_val": 0, "max_val": 500000}
+            ],
+            "destination_config": {
+                "destination_type": "POSTGRES_TABLE",
+                "table_name": "target_employee_clean",
+                "if_exists": "replace"
+            }
+        }
+    )
+    assert pipeline_res.status_code == 201
+    pipeline_id = pipeline_res.json()["id"]
+
+    # 3. Trigger Generic Pipeline Run
+    run_res = client.post(
+        f"/api/pipelines/{pipeline_id}/run",
+        headers={"Authorization": f"Bearer {token}"}
+    )
+    assert run_res.status_code == 200
+    exec_data = run_res.json()
+
+    assert exec_data["status"] == "SUCCESS"
+    assert exec_data["records_read"] == 4
+    assert exec_data["records_processed"] == 3  # 1 duplicate EMP-101 removed
+    assert exec_data["records_loaded"] == 3
+

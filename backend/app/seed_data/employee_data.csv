@@ -1,0 +1,11 @@
+employee_id,employee_name,department,designation,joining_date,location,salary,employment_type
+EMP-101,Sarah Jenkins,Engineering,Senior Data Engineer,2023-01-15,San Francisco,145000,Full-Time
+EMP-102,David Miller,Product,Product Manager,2022-06-10,New York,138000,Full-Time
+EMP-103,Elena Rostova,Data Science,Lead ML Engineer,2021-11-01,London,155000,Full-Time
+EMP-104,Marcus Vance,Operations,DevOps Engineer,2023-04-20,Austin,125000,Full-Time
+EMP-105,Aisha Patel,Engineering,Frontend Architect,2022-09-12,Toronto,140000,Full-Time
+EMP-106,Liam O'Connor,HR,Talent Lead,2024-02-01,Dublin,95000,Full-Time
+EMP-107,Chloe Zhao,Finance,Financial Analyst,2023-08-15,Singapore,110000,Full-Time
+EMP-108,Julian Thorne,Security,Security Architect,2021-03-30,Berlin,160000,Full-Time
+EMP-109,Sophia Martinez,Marketing,Content Strategist,2024-01-10,Chicago,88000,Contractor
+EMP-110,Noah Kim,Engineering,Backend Engineer,2023-10-05,Seattle,130000,Full-Time

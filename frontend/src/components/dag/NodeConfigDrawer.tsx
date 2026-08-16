@@ -386,7 +386,7 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
                   className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-indigo-500/40 text-xs text-indigo-300 font-mono font-semibold"
                 >
                   {warehouseModels.length > 0 ? (
-                    warehouseModels.map((wm) => (
+                    Array.from(new Map(warehouseModels.map((wm) => [wm.slug.toLowerCase(), wm])).values()).map((wm) => (
                       <option key={wm.id} value={wm.id}>
                         {wm.name} ({wm.domain})
                       </option>
@@ -397,6 +397,7 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
                       <option value="manufacturing">Manufacturing Analytics (MANUFACTURING)</option>
                     </>
                   )}
+
                 </select>
               </div>
             )}

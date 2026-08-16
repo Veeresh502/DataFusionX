@@ -21,6 +21,7 @@ from app.services.warehouse import (
     seed_sample_manufacturing,
     clear_warehouse_manufacturing_data,
     get_warehouse_tables_summary,
+    get_flat_transformed_datasets,
     get_warehouse_table_detail,
     get_warehouse_analytics,
     load_sales_star_schema,
@@ -138,12 +139,21 @@ def reset_manufacturing_data_endpoint(
 
 
 # --- LEGACY / BACKWARD-COMPATIBLE ENDPOINTS ---
+@router.get("/flat-datasets", response_model=List[WarehouseTableSummary])
+def list_flat_transformed_datasets(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_read_access),
+) -> List[WarehouseTableSummary]:
+    return get_flat_transformed_datasets(db)
+
+
 @router.get("/tables", response_model=List[WarehouseTableSummary])
 def get_tables_summary(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_read_access),
 ) -> List[WarehouseTableSummary]:
     return get_warehouse_tables_summary(db)
+
 
 
 @router.get("/tables/{table_name}", response_model=WarehouseTableDetail)

@@ -773,10 +773,19 @@ def clear_warehouse_manufacturing_data(db: Session) -> Dict[str, int]:
 # --- MODEL-AWARE WAREHOUSE APIS & METRICS SERVICES ---
 def get_warehouse_models_list(db: Session, organization_id: int) -> List[WarehouseModel]:
     ensure_default_warehouse_models(db, organization_id)
-    return db.query(WarehouseModel).filter(
+    models = db.query(WarehouseModel).filter(
         WarehouseModel.organization_id == organization_id,
         WarehouseModel.is_active == True
-    ).all()
+    ).order_by(WarehouseModel.id.asc()).all()
+
+    seen_slugs = set()
+    unique_models = []
+    for m in models:
+        if m.slug.lower() not in seen_slugs:
+            seen_slugs.add(m.slug.lower())
+            unique_models.append(m)
+    return unique_models
+
 
 
 def get_warehouse_model_by_identifier(db: Session, model_id_or_slug: Any, organization_id: int) -> WarehouseModel:
@@ -942,8 +951,47 @@ def get_warehouse_tables_summary(db: Session, model_slug_or_id: Optional[Any] = 
     return result
 
 
+def get_flat_transformed_datasets(db: Session) -> List[Dict[str, Any]]:
+    """Returns a list of all generic flat transformed PostgreSQL tables loaded by ETL pipelines."""
+    inspector = inspect(db.bind)
+    all_tables = inspector.get_table_names()
+
+    system_and_star_tables = {
+        "alembic_version", "organizations", "users", "projects", "data_sources",
+        "pipelines", "pipeline_executions", "pipeline_schedules", "data_profiles",
+        "warehouse_models", "warehouse_tables",
+        "fact_sales", "dim_customer", "dim_product", "dim_location", "dim_date",
+        "fact_production", "dim_machine", "dim_plant"
+    }
+
+    flat_tables = [t for t in all_tables if t not in system_and_star_tables]
+
+    result = []
+    for t_name in flat_tables:
+        try:
+            col_info = inspector.get_columns(t_name)
+            col_count = len(col_info)
+            row_count_res = db.execute(text(f'SELECT COUNT(*) FROM "{t_name}"')).scalar()
+            row_count = int(row_count_res or 0)
+
+            pk_info = inspector.get_pk_constraint(t_name)
+            pks = pk_info.get("constrained_columns", []) if pk_info else []
+
+            result.append({
+                "table_name": t_name,
+                "column_count": col_count,
+                "row_count": row_count,
+                "primary_keys": pks,
+                "foreign_keys": [],
+            })
+        except Exception:
+            continue
+
+    return result
+
+
 def get_warehouse_table_detail(table_name: str, db: Session) -> Dict[str, Any]:
-    """Returns detailed columns, types, PKs/FKs, and sample records for a table."""
+    """Returns detailed columns, types, PKs/FKs, and sample records for any warehouse or flat table."""
     model_map = {
         "fact_sales": (FactSales, ["sale_key"], ["customer_key", "product_key", "date_key", "location_key"]),
         "dim_customer": (DimCustomer, ["customer_key"], []),
@@ -955,38 +1003,70 @@ def get_warehouse_table_detail(table_name: str, db: Session) -> Dict[str, Any]:
         "dim_plant": (DimPlant, ["plant_key"], []),
     }
 
-    if table_name not in model_map:
-        raise ValueError(f"Table '{table_name}' is not a valid warehouse table")
+    if table_name in model_map:
+        model, pks, fks = model_map[table_name]
+        row_count = db.query(model).count()
+        sample_objs = db.query(model).limit(20).all()
 
-    model, pks, fks = model_map[table_name]
-    row_count = db.query(model).count()
-    sample_objs = db.query(model).limit(20).all()
+        columns_info = []
+        for col in model.__table__.columns:
+            columns_info.append({
+                "name": col.name,
+                "type": str(col.type),
+                "is_primary_key": col.primary_key,
+                "is_foreign_key": col.name in fks,
+            })
+
+        sample_records = []
+        for obj in sample_objs:
+            row_dict = {}
+            for col in model.__table__.columns:
+                val = getattr(obj, col.name)
+                if isinstance(val, (datetime, date)):
+                    val = str(val)
+                row_dict[col.name] = val
+            sample_records.append(row_dict)
+
+        return {
+            "table_name": table_name,
+            "columns": columns_info,
+            "primary_keys": pks,
+            "foreign_keys": fks,
+            "row_count": row_count,
+            "sample_records": sample_records,
+        }
+
+    # Inspection for generic flat PostgreSQL tables
+    inspector = inspect(db.bind)
+    if table_name not in inspector.get_table_names():
+        raise ValueError(f"Table '{table_name}' does not exist in database")
+
+    col_info = inspector.get_columns(table_name)
+    row_count_res = db.execute(text(f'SELECT COUNT(*) FROM "{table_name}"')).scalar()
+    row_count = int(row_count_res or 0)
+
+    pk_info = inspector.get_pk_constraint(table_name)
+    pks = pk_info.get("constrained_columns", []) if pk_info else []
 
     columns_info = []
-    for col in model.__table__.columns:
+    for c in col_info:
         columns_info.append({
-            "name": col.name,
-            "type": str(col.type),
-            "is_primary_key": col.primary_key,
-            "is_foreign_key": col.name in fks,
+            "name": c["name"],
+            "type": str(c["type"]),
+            "is_primary_key": c["name"] in pks,
+            "is_foreign_key": False,
         })
 
-    sample_records = []
-    for obj in sample_objs:
-        row_dict = {}
-        for col in model.__table__.columns:
-            val = getattr(obj, col.name)
-            if isinstance(val, (datetime, date)):
-                val = str(val)
-            row_dict[col.name] = val
-        sample_records.append(row_dict)
+    raw_sample = db.execute(text(f'SELECT * FROM "{table_name}" LIMIT 20')).mappings().all()
+    sample_records = [dict(row) for row in raw_sample]
 
     return {
         "table_name": table_name,
         "columns": columns_info,
         "primary_keys": pks,
-        "foreign_keys": fks,
+        "foreign_keys": [],
         "row_count": row_count,
         "sample_records": sample_records,
     }
+
 

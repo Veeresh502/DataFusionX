@@ -36,6 +36,7 @@ import {
   AlertTriangle,
   Factory,
   Cpu,
+  Inbox,
 } from 'lucide-react';
 
 export const WarehouseDashboardPage: React.FC = () => {
@@ -55,9 +56,12 @@ export const WarehouseDashboardPage: React.FC = () => {
     fetchModels();
   }, []);
 
+
   useEffect(() => {
     if (selectedModelSlug) {
       fetchModelData(selectedModelSlug);
+    } else {
+      fetchDefaultGenericData();
     }
   }, [selectedModelSlug]);
 
@@ -65,13 +69,27 @@ export const WarehouseDashboardPage: React.FC = () => {
     try {
       const modelList = await warehouseService.listModels();
       setModels(modelList);
-      if (modelList.length > 0 && !modelList.some((m) => m.slug === selectedModelSlug)) {
-        setSelectedModelSlug(modelList[0].slug);
-      }
     } catch (err) {
       console.error('Failed to list warehouse models', err);
     }
   };
+
+  const fetchDefaultGenericData = async () => {
+
+    setLoading(true);
+    try {
+      const tableList = await warehouseService.getTablesSummary();
+      setTables(tableList);
+      setSalesAnalytics(null);
+      setMfgAnalytics(null);
+      setGenericAnalytics(null);
+    } catch (err) {
+      console.error('Failed to fetch default warehouse tables', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
   const fetchModelData = async (slug: string) => {
     setLoading(true);
@@ -113,16 +131,19 @@ export const WarehouseDashboardPage: React.FC = () => {
     }
   };
 
-  const activeModel = models.find((m) => m.slug === selectedModelSlug) || {
+  const activeModel = models.find((m) => m.slug === selectedModelSlug) || (selectedModelSlug ? {
     id: 1,
     name: selectedModelSlug === 'manufacturing' ? 'Manufacturing Analytics' : 'Sales Analytics',
     slug: selectedModelSlug,
     domain: selectedModelSlug === 'manufacturing' ? 'MANUFACTURING' : 'SALES',
-    description: 'Enterprise Data Warehouse Model',
-  };
+    description: 'Enterprise Data Warehouse Reference Model',
+  } : null);
 
   const handleSeedSample = async () => {
-
+    if (!activeModel) {
+      toast.error('No Model Selected', 'Select a warehouse model before seeding demo data.');
+      return;
+    }
     setSeeding(true);
     try {
       if (activeModel.domain === 'MANUFACTURING') {
@@ -141,10 +162,12 @@ export const WarehouseDashboardPage: React.FC = () => {
   };
 
   const handleResetWarehouse = async () => {
+    if (!activeModel) return;
     setShowResetConfirm(true);
   };
 
   const executeResetWarehouse = async () => {
+    if (!activeModel) return;
     const isMfg = activeModel.domain === 'MANUFACTURING';
     setShowResetConfirm(false);
     setLoading(true);
@@ -190,16 +213,20 @@ export const WarehouseDashboardPage: React.FC = () => {
                 <Database className="w-8 h-8 text-indigo-400" />
                 <span>Enterprise Data Warehouse</span>
               </h1>
-              <span className="px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                {activeModel.domain}
-              </span>
+              {activeModel ? (
+                <span className="px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                  {activeModel.domain}
+                </span>
+              ) : (
+                <span className="px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-slate-800 text-slate-400 border border-slate-700">
+                  GENERIC PLATFORM
+                </span>
+              )}
             </div>
             <p className="text-slate-400 text-sm mt-1">
-              Model: <span className="text-white font-semibold">{activeModel.name}</span> — Kimball Star Schema Architecture
+              Model: <span className="text-white font-semibold">{activeModel ? activeModel.name : 'All Models / Unselected'}</span> — Multi-Domain Analytical Platform
             </p>
-          </div>
-
-          <div className="flex items-center gap-3">
+          </div>          <div className="flex items-center gap-3">
             {/* Warehouse Model Selector */}
             <div className="flex items-center gap-2 bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-800">
               <Layers className="w-4 h-4 text-indigo-400" />
@@ -209,8 +236,12 @@ export const WarehouseDashboardPage: React.FC = () => {
                 onChange={(e) => setSelectedModelSlug(e.target.value)}
                 className="bg-transparent text-xs font-mono font-bold text-indigo-300 focus:outline-none cursor-pointer"
               >
+
+                <option value="" className="bg-slate-900 text-slate-300">
+                  -- Select Warehouse Model --
+                </option>
                 {models.length > 0 ? (
-                  models.map((m) => (
+                  Array.from(new Map(models.map((m) => [m.slug.toLowerCase(), m])).values()).map((m) => (
                     <option key={m.id} value={m.slug} className="bg-slate-900 text-slate-200">
                       {m.name} ({m.domain})
                     </option>
@@ -225,30 +256,63 @@ export const WarehouseDashboardPage: React.FC = () => {
                     </option>
                   </>
                 )}
+
               </select>
             </div>
 
-            <button
-              onClick={handleSeedSample}
-              disabled={seeding}
-              className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium flex items-center gap-1.5 shadow-lg shadow-indigo-500/20 transition-all disabled:opacity-50"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>{seeding ? 'Seeding...' : 'Seed Sample Data'}</span>
-            </button>
+            {activeModel && (
+              <>
+                <button
+                  onClick={handleSeedSample}
+                  disabled={seeding}
+                  className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium flex items-center gap-1.5 shadow-lg shadow-indigo-500/20 transition-all disabled:opacity-50"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>{seeding ? 'Seeding...' : 'Seed Sample Data'}</span>
+                </button>
 
-            <button
-              onClick={handleResetWarehouse}
-              className="px-3.5 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/30 text-xs font-medium flex items-center gap-1.5 transition-all"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-              <span>Reset Data</span>
-            </button>
+                <button
+                  onClick={handleResetWarehouse}
+                  className="px-3.5 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/30 text-xs font-medium flex items-center gap-1.5 transition-all"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Reset Model Data</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
 
+        {/* UNSELECTED EMPTY STATE BANNER */}
+
+        {!activeModel && (
+          <div className="glass-panel p-8 rounded-2xl border border-indigo-500/20 bg-indigo-950/20 text-center space-y-3">
+            <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 flex items-center justify-center mx-auto">
+              <Inbox className="w-6 h-6" />
+            </div>
+            <h2 className="text-lg font-bold text-white">No Warehouse Model Selected</h2>
+            <p className="text-xs text-slate-300 max-w-xl mx-auto">
+              Select a analytical warehouse model (such as <span className="text-indigo-300 font-semibold">Sales Analytics</span> or <span className="text-indigo-300 font-semibold">Manufacturing Analytics</span>) from the dropdown above to explore its schema, fact/dimension tables, and domain-specific KPIs.
+            </p>
+            <div className="flex justify-center gap-3 pt-2">
+              <button
+                onClick={() => setSelectedModelSlug('sales')}
+                className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium transition-colors"
+              >
+                Explore Sales Analytics
+              </button>
+              <button
+                onClick={() => setSelectedModelSlug('manufacturing')}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-medium transition-colors"
+              >
+                Explore Manufacturing Analytics
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* DOMAIN-SPECIFIC KPI CARDS */}
-        {activeModel.domain === 'SALES' && salesAnalytics && (
+        {activeModel && activeModel.domain === 'SALES' && salesAnalytics && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             <div className="glass-panel p-5 rounded-2xl border border-slate-800 space-y-2 relative overflow-hidden">
               <div className="flex items-center justify-between text-slate-400">
@@ -262,7 +326,7 @@ export const WarehouseDashboardPage: React.FC = () => {
               </div>
               <p className="text-[11px] text-emerald-400 flex items-center gap-1 font-mono">
                 <TrendingUp className="w-3 h-3" />
-                Agregated from fact_sales revenue measure
+                Aggregated from fact_sales revenue measure
               </p>
             </div>
 
@@ -294,7 +358,7 @@ export const WarehouseDashboardPage: React.FC = () => {
           </div>
         )}
 
-        {activeModel.domain === 'MANUFACTURING' && mfgAnalytics && (
+        {activeModel && activeModel.domain === 'MANUFACTURING' && mfgAnalytics && (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
             <div className="glass-panel p-5 rounded-2xl border border-slate-800 space-y-2">
               <div className="flex items-center justify-between text-slate-400">
@@ -373,10 +437,10 @@ export const WarehouseDashboardPage: React.FC = () => {
         )}
 
         {/* STAR SCHEMA ARCHITECTURE DIAGRAM */}
-        <StarSchemaDiagram tables={tableMap} domain={activeModel.domain} />
+        <StarSchemaDiagram tables={tableMap} domain={activeModel ? activeModel.domain : 'GENERIC'} />
 
         {/* DOMAIN ANALYTICS CHARTS */}
-        {activeModel.domain === 'SALES' && salesAnalytics && (
+        {activeModel && activeModel.domain === 'SALES' && salesAnalytics && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-4">
               <h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono flex items-center justify-between">
@@ -422,7 +486,7 @@ export const WarehouseDashboardPage: React.FC = () => {
           </div>
         )}
 
-        {activeModel.domain === 'MANUFACTURING' && mfgAnalytics && (
+        {activeModel && activeModel.domain === 'MANUFACTURING' && mfgAnalytics && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-4">
               <h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono flex items-center justify-between">
@@ -469,10 +533,11 @@ export const WarehouseDashboardPage: React.FC = () => {
         )}
 
         {/* WAREHOUSE TABLES SUMMARY LIST */}
+
         <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-4">
           <h2 className="text-lg font-bold text-white flex items-center gap-2">
             <TableIcon className="w-5 h-5 text-indigo-400" />
-            <span>Warehouse Tables Explorer — {activeModel.name}</span>
+            <span>Warehouse Tables Explorer — {activeModel ? activeModel.name : 'All Warehouse Tables'}</span>
           </h2>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
@@ -519,18 +584,21 @@ export const WarehouseDashboardPage: React.FC = () => {
           </div>
         </div>
 
-        <ConfirmModal
-          isOpen={showResetConfirm}
-          title="Reset Warehouse Model"
-          message={`Are you sure you want to clear/reset all ${activeModel.name} tables? All fact and dimension records will be deleted.`}
-          confirmText="Clear Warehouse Data"
-          cancelText="Cancel"
-          type="danger"
-          onConfirm={executeResetWarehouse}
-          onCancel={() => setShowResetConfirm(false)}
-        />
+        {activeModel && (
+
+
+          <ConfirmModal
+            isOpen={showResetConfirm}
+            title="Reset Warehouse Model"
+            message={`Are you sure you want to clear/reset all ${activeModel.name} tables? All fact and dimension records will be deleted.`}
+            confirmText="Clear Warehouse Data"
+            cancelText="Cancel"
+            type="danger"
+            onConfirm={executeResetWarehouse}
+            onCancel={() => setShowResetConfirm(false)}
+          />
+        )}
       </div>
     </MainLayout>
   );
 };
-

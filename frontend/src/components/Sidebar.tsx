@@ -65,6 +65,20 @@ export const Sidebar: React.FC = () => {
           <span>ETL Pipelines</span>
         </NavLink>
         <NavLink
+          to="/transformed-datasets"
+          className={({ isActive }) =>
+            `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+              isActive
+                ? 'bg-emerald-600/20 text-emerald-300 border border-emerald-500/30 shadow-inner'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+            }`
+          }
+        >
+          <Database className="w-4 h-4 text-emerald-400" />
+          <span>Transformed Datasets</span>
+        </NavLink>
+
+        <NavLink
           to="/schedules"
           className={({ isActive }) =>
             `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${

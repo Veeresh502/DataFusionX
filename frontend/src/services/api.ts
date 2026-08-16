@@ -232,6 +232,18 @@ export const warehouseService = {
     return response.data;
   },
 
+  getTablesSummary: async (): Promise<WarehouseTableSummary[]> => {
+    const response = await apiClient.get<WarehouseTableSummary[]>('/api/warehouse/tables');
+    return response.data;
+  },
+
+  getFlatDatasets: async (): Promise<WarehouseTableSummary[]> => {
+    const response = await apiClient.get<WarehouseTableSummary[]>('/api/warehouse/flat-datasets');
+    return response.data;
+  },
+
+
+
   getTableDetail: async (tableName: string): Promise<WarehouseTableDetail> => {
     const response = await apiClient.get<WarehouseTableDetail>(`/api/warehouse/tables/${tableName}`);
     return response.data;
