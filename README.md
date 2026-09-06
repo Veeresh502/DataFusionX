@@ -4,21 +4,31 @@
 
 ### Enterprise-Grade Data Engineering, Pipeline Orchestration & AI Intelligence Platform
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](LICENSE)
+[![Platform Version](https://img.shields.io/badge/Platform-v1.3_(M13)-7928CA?style=for-the-badge)](https://github.com/Veeresh502/DataFusionX)
+[![Docker Compose](https://img.shields.io/badge/Docker_Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![React](https://img.shields.io/badge/React_18-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](https://reactjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL_16-316192?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Celery](https://img.shields.io/badge/Celery-37814A?style=for-the-badge&logo=celery&logoColor=white)](https://docs.celeryq.dev/)
 [![Redis](https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=redis&logoColor=white)](https://redis.io/)
-[![Docker](https://img.shields.io/badge/Docker_Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
 [![Prometheus](https://img.shields.io/badge/Prometheus-E6522C?style=for-the-badge&logo=prometheus&logoColor=white)](https://prometheus.io/)
 [![Grafana](https://img.shields.io/badge/Grafana-F46800?style=for-the-badge&logo=grafana&logoColor=white)](https://grafana.com/)
 
+<br>
+
 <p align="center">
-  <b>A unified, resilient platform for multi-tenant data ingestion, visual drag-and-drop DAG building, distributed asynchronous ETL, enterprise star-schema warehousing, automated scheduling, real-time observability, and deterministic AI Data Quality Intelligence.</b>
+  <b>A unified, resilient data platform combining visual drag-and-drop workflow orchestration, distributed asynchronous execution, multi-domain star schemas, AST-guarded Text-to-SQL, and deterministic AI Data Quality Intelligence.</b>
 </p>
 
-[Key Capabilities](#-platform-capabilities) • [System Architecture](#-system-architecture) • [UI & Navigation](#-ui--platform-modules) • [Tech Stack](#-technology-stack) • [Quick Start](#-quick-start) • [Service Directory](#-service-directory) • [Testing](#-testing--quality-assurance)
+<br>
+
+![DataFusionX Platform Overview](docs/assets/platform-demo.gif)
+
+<br>
+
+[Key Capabilities](#-flagship-capabilities) • [Visual DAG Builder](#1-visual-dag-pipeline-builder) • [AI Data Quality](#2-ai-data-quality--anomaly-intelligence-m13) • [Architecture](#-system-architecture) • [UI & Modules](#-ui--platform-modules) • [Tech Stack](#-technology-stack) • [Quick Start](#-quick-start) • [Service Directory](#-service-directory)
 
 ---
 
@@ -26,12 +36,14 @@
 
 ## 📌 Executive Overview
 
-**DataFusionX** consolidates the modern data engineering lifecycle into an intuitive, observable, and enterprise-grade control plane. Rather than cobbling together disparate tools for ingestion, transformation, scheduling, and data validation, DataFusionX provides a single cohesive experience:
+Modern data stacks often suffer from fragmentation—separate tools for pipeline authoring, distributed job scheduling, data profiling, warehouse modeling, and LLM querying. 
 
-- 🎨 **Visual & Declarative DAG Pipelines**: Design complex ETL workflows with an interactive ReactFlow canvas or declare them programmatically.
-- ⚡ **Distributed Asynchronous ETL Engine**: Long-running ingestion jobs execute in decoupled Celery worker pools with Redis queues and live WebSocket progress streaming.
+**DataFusionX** solves this by unifying the entire data engineering and intelligence lifecycle into a single, cohesive, production-ready platform:
+
+- 🎨 **Visual & Declarative Pipelines**: Build complex DAG workflows with an interactive ReactFlow canvas or declare them programmatically.
+- ⚡ **Distributed Asynchronous ETL**: Decoupled Celery worker pools eliminate web timeouts with Redis queuing and real-time WebSocket progress streaming.
 - 🏬 **Multi-Domain Star Schemas**: Load clean records into structured Sales Analytics, Manufacturing Analytics, or dynamic custom analytical warehouses.
-- 🤖 **AI Pipeline Copilot & Safe Text-to-SQL**: Convert natural language prompts into verified DAG specifications and AST-guarded, read-only analytical queries.
+- 🤖 **AI Pipeline Copilot & Safe Text-to-SQL**: Prompt LLMs in natural language to propose verified DAGs and AST-guarded, read-only SQL queries grounded in active schema metadata.
 - 🛡️ **AI Data Quality & Anomaly Intelligence**: Deterministic mathematical score reconciliation, non-parametric IQR outlier detection, high-cardinality key collisions, null spikes, format validation, and AI-enriched remediation insights.
 - 📊 **Turnkey Enterprise Observability**: Native Prometheus telemetry metrics and pre-provisioned Grafana monitoring dashboards.
 
@@ -72,57 +84,99 @@
 
 ---
 
-## 🚀 Platform Capabilities
+## 🚀 Flagship Capabilities
 
 ### 1. Visual DAG Pipeline Builder
-- **Interactive Canvas**: Powered by ReactFlow with live zooming, panning, auto-layout, and connector snapping.
-- **Comprehensive Node Palette**:
-  - **Sources**: CSV, JSON, PostgreSQL, REST API endpoints.
-  - **Transformations**: `Remove Duplicates`, `Fill NULL`, `Drop NULL`, `Trim Text`, `Normalize Text`, `Rename Columns`, `Change Data Types`, `Filter Rows`, `Calculate Column`.
-  - **Validations**: `NOT NULL`, `UNIQUE`, `RANGE`, `REGEX` constraints.
-  - **Destinations**: `Generic Warehouse`, `Sales Analytics Star Schema`, `Manufacturing Analytics Star Schema`.
-- **Pre-Execution Topology Compiler**: Performs graph cycle detection, checks unreferenced upstream columns, and verifies parameter contracts before execution begins.
 
-### 2. Distributed Asynchronous ETL Engine
+Design, configure, and inspect data extraction and transformation pipelines on an interactive, visual canvas:
+
+![Visual DAG Pipeline Builder](docs/assets/visual-dag-builder.gif)
+
+- **Interactive ReactFlow Canvas**: Live zooming, smooth panning, auto-layout formatting, and connector snapping.
+- **Comprehensive Node Palette**:
+  - 📥 **Sources**: CSV, JSON, PostgreSQL tables, REST API endpoints.
+  - 🔄 **Transformations**: `Remove Duplicates`, `Fill NULL`, `Drop NULL`, `Trim Text`, `Normalize Text`, `Rename Columns`, `Change Data Types`, `Filter Rows`, `Calculate Column`.
+  - 🛡️ **Validations**: `NOT NULL`, `UNIQUE`, `RANGE`, `REGEX` constraints.
+  - 🏬 **Destinations**: `Generic Warehouse`, `Sales Analytics Star Schema`, `Manufacturing Analytics Star Schema`.
+- **Pre-Execution Topology Compiler**: Detects graph cycles, catches unreferenced upstream columns, and verifies parameter contracts before execution begins.
+- **Node Drawer Inspector**: Slide-over configuration drawer allows granular node customization with instant configuration persistence.
+
+---
+
+### 2. AI Data Quality & Anomaly Intelligence (M13)
+
+A deterministic, mathematically grounded profiling engine coupled with AI-enriched remediation insights:
+
+![AI Data Quality Intelligence](docs/assets/data-quality-intelligence.gif)
+
+- **Single Source of Truth**: All statistical metrics, null counts, distinct counts, outliers, penalties, and overall quality scores are computed exclusively by the backend profiling engine—zero client-side calculation.
+- **Transparent Mathematical Reconciliation**:
+  The final quality score reconciles dimension scores with an anomaly deduction penalty:
+
+  $$\text{Base Weighted Score} = (\text{Completeness} \times 0.35) + (\text{Uniqueness} \times 0.35) + (\text{Validity} \times 0.30)$$
+
+  $$\text{Final Quality Score} = \max\Big(0, \min\big(100, \text{Base Weighted Score} - \text{Total Penalties}\big)\Big)$$
+
+- **Standardized Severity Penalty Matrix**:
+
+| Finding Severity | Penalty Deduction | Description |
+| :---: | :---: | :--- |
+| 🔴 **Critical** | `-10.0 pts` | Severe schema violations, missing primary keys, corrupted required fields |
+| 🟡 **Warning** | `-3.0 pts` | Statistical IQR outliers, format anomalies, inconsistent capitalization |
+| 🔵 **Informational** | `0.0 pts` | Metadata observations, distribution notes, cardinality statistics |
+| 🛡️ **Penalty Cap** | `-50.0 pts max` | Prevents negative score runaway on severely degraded datasets |
+
+- **Deterministic Anomaly Detectors**:
+  - 📈 **IQR Outliers**: Non-parametric Interquartile Range ($Q_1, Q_3, \text{IQR}$, statistical fences) with minimum sample-size guardrails ($N \ge 4$).
+  - 🔍 **Candidate Key & Row Duplicates**: Identifies primary keys and candidate keys via token boundaries (`id`, `uuid`, `key`, `hash`) and uniqueness heuristics ($>85\%$), detecting both full-row and key collisions.
+  - 🚫 **Null & Empty Value Spikes**: Column-level NULL ratios, whitespace-only strings, and empty value checks.
+  - 🔤 **Format & Casing Normalization**: Strict regex email formatting and capitalization consistency checks across text series.
+- **Executive AI Insights**: LLM layer synthesizes mathematical anomalies into executive-ready narratives and actionable remediation recommendations without altering computed metrics.
+
+---
+
+### 3. AI Pipeline Copilot & Safe Text-to-SQL
+
+Accelerate pipeline creation and analytical exploration with LLM-assisted tools equipped with strict safety guardrails:
+
+<div align="center">
+  <img src="docs/assets/copilot-preview.png" alt="AI Copilot & Text-to-SQL" width="900" style="border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" />
+</div>
+
+- **Natural Language to DAG Generation**: Describe business logic in plain conversational English; the copilot returns verified DAG topologies and node parameters.
+- **Direct Visual Builder Handoff**: Review and modify AI-suggested pipelines directly in the visual builder before approving execution.
+- **AST-Guarded Text-to-SQL**: Generates analytics queries grounded in active schema metadata. Every generated SQL statement is validated using an Abstract Syntax Tree (AST) parser to strictly enforce:
+  - Read-only operations (`SELECT` queries only; `DROP`, `INSERT`, `UPDATE`, `ALTER` are blocked).
+  - Table name allowlisting (prevents access to auth/credential tables).
+  - Automatic row limit safety caps (`LIMIT 500`).
+
+---
+
+### 4. Distributed Asynchronous ETL Engine
+
+Scale batch ingestion with fault tolerance and real-time execution visibility:
+
 - **Decoupled Task Execution**: Eliminates HTTP timeouts by delegating heavy data processing to isolated Celery worker processes.
 - **Real-Time WebSocket Streaming**: Dispatches live stage transitions (`EXTRACTING` $\rightarrow$ `TRANSFORMING` $\rightarrow$ `VALIDATING` $\rightarrow$ `LOADING` $\rightarrow$ `SUCCESS` / `FAILED`) directly to user dashboards.
 - **Fault-Tolerant Retries**: Configurable exponential backoff retries with full records-processed and records-failed auditing.
 
-### 3. Enterprise Multi-Domain Data Warehouse
+---
+
+### 5. Multi-Domain Data Warehousing
+
+Organize clean data into structured analytical models:
+
 - **Sales Analytics Model**: Pre-configured star schema containing `fact_sales` surrounded by `dim_customer`, `dim_product`, and `dim_date`.
 - **Manufacturing Analytics Model**: Production star schema tracking `fact_production`, `dim_machine`, `dim_plant`, and `dim_operator`.
 - **Dynamic Generic Warehouse**: Automatically structures relational tables on-the-fly for arbitrary uploaded schemas.
 - **Domain Schema Guard**: Validates incoming datasets against target warehouse dimensions and facts to prevent accidental corruption.
 
-### 4. AI Pipeline Copilot & Safe Text-to-SQL
-- **Conversational DAG Generation**: Describe business logic in plain English to receive verified DAG topologies and node configurations.
-- **Direct Visual Builder Handoff**: Review and modify AI-suggested pipelines directly in the visual builder before approving execution.
-- **AST-Guarded Text-to-SQL**: Generates analytics queries grounded in active schema metadata. Every generated SQL statement is validated using an Abstract Syntax Tree (AST) parser to strictly enforce:
-  - Read-only operations (`SELECT` queries only).
-  - Table name allowlisting (prevents access to auth/credential tables).
-  - Automatic row limit safety caps (`LIMIT 500`).
-
-### 5. AI Data Quality & Anomaly Intelligence
-- **Single Source of Truth**: All statistical metrics, counts, outliers, penalties, and quality scores are computed exclusively by the backend engine—zero client-side calculation.
-- **Deterministic Anomaly Detection**:
-  - **IQR Outliers**: Non-parametric Interquartile Range ($Q_1, Q_3, \text{IQR}$, fences) with sample-size guardrails ($N \ge 4$).
-  - **Missing Values**: Column-level NULL spikes and empty string detection.
-  - **Duplicate Detection**: Full-row duplicate scans and high-cardinality candidate key collision analysis.
-  - **Format Validation**: Strict regex email validation and text capitalization normalization checks.
-- **Transparent Mathematical Reconciliation**:
-  $$\text{Base Weighted Score} = (\text{Completeness} \times 0.35) + (\text{Uniqueness} \times 0.35) + (\text{Validity} \times 0.30)$$
-  $$\text{Final Quality Score} = \max\Big(0, \min\big(100, \text{Base Weighted Score} - \text{Total Penalties}\big)\Big)$$
-
-| Finding Severity | Penalty Deduction | Description |
-| :--- | :---: | :--- |
-| 🔴 **Critical** | `-10.0 pts` | Severe schema violations, missing primary keys, extreme data corruption |
-| 🟡 **Warning** | `-3.0 pts` | Statistical outliers, format anomalies, inconsistent casing |
-| 🔵 **Informational** | `0.0 pts` | Metadata observations, distribution notes |
-| 🛡️ **Total Penalty Cap** | `-50.0 pts max` | Prevents negative score runaway on highly anomalous datasets |
-
-- **Contextual AI Summaries**: LLM layer translates mathematical anomalies into executive-ready narratives and actionable remediation recommendations without altering computed metrics.
+---
 
 ### 6. Automated Scheduling & Observability
+
+Enterprise-grade job dispatching and real-time telemetry:
+
 - **Cron Scheduling**: Celery Beat scheduler supporting standard 5-part cron expressions, configurable timezones, and duplicate dispatch prevention.
 - **Prometheus Telemetry**: Native `/metrics` exporter capturing pipeline runtimes, throughput, queue depths, and database connection pools.
 - **Grafana Dashboards**: Out-of-the-box dashboards provisioned automatically for instant infrastructure and pipeline visibility.
@@ -131,9 +185,9 @@
 
 ## 🖥 UI & Platform Modules
 
-DataFusionX provides a modern, responsive single-page application:
+DataFusionX provides a modern, responsive single-page web console:
 
-| Module | Route | Purpose |
+| Module | Route | Primary Capabilities |
 | :--- | :--- | :--- |
 | 📊 **Dashboard** | `/dashboard` | System health overview, recent pipeline runs, and warehouse metrics |
 | 🔌 **Data Sources** | `/data-sources` | Ingestion catalog for CSV, JSON, PostgreSQL, and REST API sources |
@@ -235,6 +289,8 @@ docker compose exec backend pytest -v app/tests/test_profiling.py
 
 ```text
 DataFusionX/
+├── docs/
+│   └── assets/                 # Animated GIFs and high-resolution platform previews
 ├── backend/
 │   ├── app/
 │   │   ├── api/endpoints/      # REST API endpoints (auth, sources, pipelines, ai, warehouse)
