@@ -196,21 +196,21 @@ All containers will display an `Up` / `healthy` status:
 docker compose exec backend alembic upgrade head
 ```
 
-You can now open [http://localhost:3000](http://localhost:3000) and register your administrator account.
+You can now open the web application in your browser and register your administrator account.
 
 ---
 
 ## 🌐 Service Directory
 
-| Service | Address | Access / Credentials | Description |
-| :--- | :--- | :--- | :--- |
-| **Web Console** | [http://localhost:3000](http://localhost:3000) | Register / Login in UI | Main user interface |
-| **REST API Gateway** | [http://localhost:8000](http://localhost:8000) | JWT Bearer Token | Core backend service |
-| **Interactive API Docs**| [http://localhost:8000/docs](http://localhost:8000/docs) | Swagger UI | API endpoint testing & schema documentation |
-| **Grafana Dashboards** | [http://localhost:3001](http://localhost:3001) | `admin` / `admin` | Real-time system and ETL telemetry |
-| **Prometheus Telemetry**| [http://localhost:9090](http://localhost:9090) | Direct Access | Raw metrics scraping & query console |
-| **PostgreSQL Database**| `localhost:5432` | Stack managed | Relational metadata and data warehouse storage |
-| **Redis Broker** | `localhost:6379` | Stack managed | Celery task queuing and caching broker |
+| Service | Port | Access / Credentials | Description |
+| :--- | :---: | :--- | :--- |
+| **Web Console** | `3000` | Register / Login in UI | Main user interface |
+| **REST API Gateway** | `8000` | JWT Bearer Token | Core backend service |
+| **Interactive API Docs**| `8000 (/docs)` | Swagger UI | API endpoint testing & schema documentation |
+| **Grafana Dashboards** | `3001` | `admin` / `admin` | Real-time system and ETL telemetry |
+| **Prometheus Telemetry**| `9090` | Direct Access | Raw metrics scraping & query console |
+| **PostgreSQL Database**| `5432` | Stack managed | Relational metadata and data warehouse storage |
+| **Redis Broker** | `6379` | Stack managed | Celery task queuing and caching broker |
 
 ---
 
