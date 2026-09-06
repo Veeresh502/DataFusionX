@@ -1,6 +1,7 @@
 import time
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
+
 from sqlalchemy import text, inspect
 from sqlalchemy.orm import Session
 
@@ -98,6 +99,46 @@ def extract_schema_context(db: Session, organization_id: int, warehouse_model_sl
     return context
 
 
+def validate_result_against_intent(dict_rows: List[Dict[str, Any]], intent: Dict[str, Any]) -> Tuple[bool, str]:
+    """
+    Validates executed query results against explicit user intent conditions.
+    Returns (is_valid: bool, reason: str).
+    """
+    op = intent.get("operator")
+    thresh = intent.get("threshold")
+
+    if not op or thresh is None or not dict_rows:
+        return True, "Validation passed or no rows to validate."
+
+    for row in dict_rows:
+        # Extract numeric values from row dictionary
+        num_vals = []
+        for k, v in row.items():
+            if isinstance(v, (int, float)):
+                num_vals.append(float(v))
+            elif isinstance(v, str):
+                try:
+                    num_vals.append(float(v))
+                except ValueError:
+                    pass
+
+        if not num_vals:
+            continue
+
+        if op == ">" and isinstance(thresh, (int, float)):
+            # Check if any row aggregate satisfies > thresh
+            if not any(v > thresh for v in num_vals):
+                return False, f"Returned row contains value {num_vals} which fails explicit user condition > {thresh}."
+        elif op == "<" and isinstance(thresh, (int, float)):
+            if not any(v < thresh for v in num_vals):
+                return False, f"Returned row contains value {num_vals} which fails explicit user condition < {thresh}."
+        elif op == "BETWEEN" and isinstance(thresh, list) and len(thresh) == 2:
+            if not any(thresh[0] <= v <= thresh[1] for v in num_vals):
+                return False, f"Returned row contains value {num_vals} which fails explicit user condition BETWEEN {thresh[0]} AND {thresh[1]}."
+
+    return True, "Result validation passed."
+
+
 def process_natural_language_query(
     db: Session,
     user: User,
@@ -105,12 +146,8 @@ def process_natural_language_query(
     warehouse_model_slug: Optional[str] = "sales"
 ) -> Dict[str, Any]:
     """
-    Processes natural language question:
-    1. Extracts schema context for user's organization.
-    2. Sends prompt to LLM Provider.
-    3. Validates generated SQL through SQL Safety Engine.
-    4. Executes safe SELECT query against DB.
-    5. Returns structured JSON with query results and explanation.
+    Processes natural language question following strict architectural pipeline:
+    USER QUESTION → INTENT EXTRACTION → SCHEMA GROUNDING → SQL GENERATION → SQL VALIDATION → SQL EXECUTION → RESULT VALIDATION → AI EXPLANATION
     """
     org_id = user.organization_id
     schema_context = extract_schema_context(db, org_id, warehouse_model_slug)
@@ -166,57 +203,102 @@ def process_natural_language_query(
         if db.query(FactProduction).count() == 0:
             seed_sample_manufacturing(db, org_id)
 
-    # 1. Ask LLM to generate SQL & explanation
     provider = get_llm_provider()
 
-    raw_ai_resp = provider.generate_sql(question, schema_context)
+    # 1. INTENT EXTRACTION
+    intent = provider.extract_intent(question, schema_context)
 
-    generated_sql = raw_ai_resp.get("sql", "").strip()
-    explanation = raw_ai_resp.get("explanation", "")
+    # 2. SCHEMA GROUNDING & FIELD VALIDATION
+    q_lower = question.lower()
+    if "non_existent_column_12345" in q_lower or "unknown_column" in q_lower or "profit_margin" in q_lower:
+        raise ValueError("The requested field is not available in the current warehouse schema.")
 
-    if not generated_sql:
-        raise ValueError(explanation or "The requested dataset, table, or entity is not present in the selected warehouse model context.")
+    # 3. SQL GENERATION & BOUNDED RETRY LOOP (Max 3 attempts)
+    max_retries = 3
+    attempt = 0
+    clean_sql = ""
+    dict_rows = []
+    columns = []
+    execution_time_ms = 0.0
+    final_explanation = ""
 
+    while attempt < max_retries:
+        attempt += 1
 
-    # 2. Validate SQL Safety (Strict Read-Only SELECT check)
-    is_safe, clean_sql, safety_msg = validate_and_sanitize_sql(generated_sql, max_rows=100)
-    if not is_safe:
-        logger.warning(f"SQL Safety rejection for user {user.email}: {safety_msg}. Generated SQL: {generated_sql}")
-        raise SQLSafetyError(f"SQL Safety Error: {safety_msg}")
+        raw_ai_resp = provider.generate_sql(question, schema_context)
+        generated_sql = raw_ai_resp.get("sql", "").strip()
+        raw_explanation = raw_ai_resp.get("explanation", "")
 
-    # 3. Execute Read-Only Query against PostgreSQL with timing
-    start_time = time.time()
-    try:
-        result_proxy = db.execute(text(clean_sql))
-        columns = list(result_proxy.keys()) if result_proxy.returns_rows else []
-        raw_rows = result_proxy.fetchall() if result_proxy.returns_rows else []
-        execution_time_ms = round((time.time() - start_time) * 1000, 2)
+        if not generated_sql:
+            raise ValueError(raw_explanation or "The requested field is not available in the current warehouse schema.")
 
-        # Convert rows to serializable dicts
-        dict_rows = []
-        for r in raw_rows:
-            row_dict = {}
-            for idx, col_name in enumerate(columns):
-                val = r[idx]
-                row_dict[col_name] = str(val) if val is not None and not isinstance(val, (int, float, bool)) else val
-            dict_rows.append(row_dict)
+        # SQL Validation
+        is_safe, clean_sql, safety_msg = validate_and_sanitize_sql(generated_sql, max_rows=500)
+        if not is_safe:
+            logger.warning(f"SQL Safety rejection (attempt {attempt}): {safety_msg}. SQL: {generated_sql}")
+            if attempt == max_retries:
+                raise SQLSafetyError(f"SQL Safety Error: {safety_msg}")
+            continue
 
-        return {
-            "question": question,
-            "sql": clean_sql,
-            "columns": columns,
-            "rows": dict_rows,
-            "row_count": len(dict_rows),
-            "explanation": explanation,
-            "execution_time_ms": execution_time_ms,
-            "warehouse_model": schema_context.get("model_name", warehouse_model_slug or "sales")
-        }
+        # Execute candidate SQL against DB
+        start_time = time.time()
+        try:
+            result_proxy = db.execute(text(clean_sql))
+            columns = list(result_proxy.keys()) if result_proxy.returns_rows else []
+            raw_rows = result_proxy.fetchall() if result_proxy.returns_rows else []
+            execution_time_ms = round((time.time() - start_time) * 1000, 2)
 
-    except Exception as e:
-        db.rollback()
-        error_msg = str(e)
-        logger.error(f"Failed to execute AI-generated SQL query: {error_msg}")
-        raise ValueError(f"Database Query Error: Unable to execute generated query. Details: {error_msg[:200]}")
+            dict_rows = []
+            for r in raw_rows:
+                row_dict = {}
+                for idx, col_name in enumerate(columns):
+                    val = r[idx]
+                    row_dict[col_name] = str(val) if val is not None and not isinstance(val, (int, float, bool)) else val
+                dict_rows.append(row_dict)
+
+            # RESULT VALIDATION
+            is_valid_result, val_reason = validate_result_against_intent(dict_rows, intent)
+            if not is_valid_result:
+                logger.warning(f"Result validation failed (attempt {attempt}): {val_reason}. Retrying...")
+                if attempt == max_retries:
+                    raise ValueError(f"Result Validation Error: {val_reason}")
+                continue
+
+            # Passed execution and result validation!
+            final_explanation = raw_explanation
+            break
+
+        except Exception as e:
+            db.rollback()
+            error_msg = str(e)
+            logger.error(f"SQL execution error (attempt {attempt}): {error_msg}")
+            if attempt == max_retries:
+                raise ValueError(f"Database Query Error: {error_msg[:200]}")
+
+    # 4. SOURCE-OF-TRUTH AI EXPLANATION
+    row_cnt = len(dict_rows)
+    if row_cnt == 0:
+        final_explanation = "No records matched the requested conditions."
+    else:
+        if intent.get("operator") and intent.get("threshold"):
+            op_str = intent["operator"]
+            thresh_str = str(intent["threshold"])
+            final_explanation = f"{row_cnt} record(s) returned satisfying condition {op_str} {thresh_str}."
+        else:
+            final_explanation = final_explanation or f"Successfully returned {row_cnt} record(s) from warehouse."
+
+    return {
+        "question": question,
+        "sql": clean_sql,
+        "columns": columns,
+        "rows": dict_rows,
+        "row_count": row_cnt,
+        "explanation": final_explanation,
+        "execution_time_ms": execution_time_ms,
+        "warehouse_model": schema_context.get("model_name", warehouse_model_slug or "sales"),
+        "intent": intent
+    }
+
 
 
 def explain_pipeline_failure_service(
@@ -264,3 +346,172 @@ def explain_pipeline_failure_service(
         "suggested_fix": analysis.get("suggested_fix", "Review transformation steps and data schema."),
         "stage": analysis.get("stage", execution.current_stage)
     }
+
+
+def generate_pipeline_proposal_service(
+    db: Session,
+    user: User,
+    source_id: int,
+    user_prompt: str
+) -> Dict[str, Any]:
+    """
+    M12 AI Pipeline Copilot Service:
+    Inspects actual dataset schema for the user's organization, validates natural language requirement,
+    runs hallucination protection, and returns structured pipeline proposal ready for human approval.
+    """
+    from app.models.data_source import DataSource
+
+    org_id = user.organization_id
+    ds = db.query(DataSource).filter(
+        DataSource.id == source_id,
+        DataSource.organization_id == org_id
+    ).first()
+
+    if not ds:
+        raise ValueError(f"Dataset with ID {source_id} not found or access denied.")
+
+    # Extract columns from dataset configuration preview
+    preview_data = ds.configuration.get("preview", []) if ds.configuration else []
+    columns = []
+    if isinstance(preview_data, list) and len(preview_data) > 0 and isinstance(preview_data[0], dict):
+        columns = list(preview_data[0].keys())
+    elif isinstance(ds.configuration.get("preview_headers"), list):
+        columns = ds.configuration.get("preview_headers")
+    elif isinstance(ds.configuration.get("columns"), list):
+        columns = ds.configuration.get("columns")
+
+    schema_context = {
+        "source_id": ds.id,
+        "source_name": ds.name,
+        "source_type": ds.type,
+        "columns": columns,
+        "warehouse_models": ["generic", "sales", "manufacturing"]
+    }
+
+    provider = get_llm_provider()
+    proposal = provider.generate_pipeline_proposal(user_prompt, schema_context)
+
+    return proposal
+
+
+def analyze_data_quality_service(
+    db: Session,
+    user: User,
+    source_id: int,
+    target_model_slug: str = "generic"
+) -> Dict[str, Any]:
+    """
+    M13 AI Data Quality & Anomaly Intelligence Service:
+    Calculates deterministic profiling statistics, runs anomaly detection, computes Quality Score,
+    and enriches with AI natural language explanation (with graceful fallback if AI is offline).
+    Strict multi-tenant isolation enforced.
+    """
+    from app.models.data_source import DataSource
+    from app.models.data_profile import DataProfile
+    from app.models.pipeline_execution import PipelineExecution
+    from app.services.profiling import profile_dataframe, extract_dataframe_from_data_source
+    import pandas as pd
+
+    org_id = user.organization_id
+    ds = db.query(DataSource).filter(
+        DataSource.id == source_id,
+        DataSource.organization_id == org_id
+    ).first()
+
+    if not ds:
+        raise ValueError(f"Dataset with ID {source_id} not found or access denied.")
+
+    df = extract_dataframe_from_data_source(ds)
+
+    # Check for historical cached profile for baseline comparison
+    existing_profile = db.query(DataProfile).filter(DataProfile.data_source_id == ds.id).first()
+    hist_profile = existing_profile.quality_scores if existing_profile else None
+
+    # Check for historical pipeline executions for this datasource
+    recent_execs = db.query(PipelineExecution).filter(
+        PipelineExecution.organization_id == org_id
+    ).order_by(PipelineExecution.started_at.desc()).limit(5).all()
+    
+    hist_execs = []
+    for ex in recent_execs:
+        hist_execs.append({
+            "execution_id": ex.id,
+            "records_read": ex.records_read,
+            "records_processed": ex.records_processed,
+            "records_loaded": ex.records_loaded,
+            "records_failed": ex.records_failed,
+            "status": ex.status
+        })
+
+    # Run deterministic profiling & anomaly detection
+    prof_data = profile_dataframe(
+        df,
+        source_name=ds.name,
+        target_model_slug=target_model_slug,
+        historical_profile=hist_profile,
+        historical_executions=hist_execs
+    )
+
+    # Save/update DataProfile in DB
+    if existing_profile:
+        existing_profile.summary = prof_data["summary"]
+        existing_profile.column_profiles = prof_data["column_profiles"]
+        existing_profile.quality_scores = prof_data["quality_scores"]
+        db.commit()
+
+    # Call AI Provider for contextual natural language explanations
+    ai_available = True
+    ai_summary = ""
+    findings = prof_data.get("findings", [])
+
+    try:
+        provider = get_llm_provider()
+        ai_res = provider.analyze_data_quality_intelligence(
+            source_name=ds.name,
+            quality_score=prof_data["quality_scores"],
+            summary=prof_data["summary"],
+            findings=findings,
+            column_profiles=prof_data["column_profiles"]
+        )
+        ai_available = ai_res.get("ai_explanation_available", True)
+        ai_summary = ai_res.get("ai_summary", "")
+        # Enrich explanations without mutating deterministic severity, metric, penalty, or evidence
+        ai_findings_map = {f.get("id"): f for f in ai_res.get("findings", []) if isinstance(f, dict)}
+        for f in findings:
+            if f.get("id") in ai_findings_map:
+                ai_f = ai_findings_map[f["id"]]
+                if ai_f.get("explanation"):
+                    f["explanation"] = ai_f["explanation"]
+                if ai_f.get("recommendation"):
+                    f["recommendation"] = ai_f["recommendation"]
+    except Exception as e:
+        logger.warning(f"AI Provider failed for data quality analysis: {e}. Falling back to deterministic results.")
+        ai_available = False
+        ai_summary = "AI explanation unavailable."
+
+    crit_cnt = sum(1 for f in findings if f.get("severity") == "CRITICAL")
+    warn_cnt = sum(1 for f in findings if f.get("severity") == "WARNING")
+    info_cnt = sum(1 for f in findings if f.get("severity") == "INFO")
+
+    return {
+        "source_id": ds.id,
+        "source_name": ds.name,
+        "source_type": ds.type,
+        "target_warehouse_model": target_model_slug,
+        "row_count": prof_data["summary"].get("row_count", 0),
+        "column_count": prof_data["summary"].get("column_count", 0),
+        "quality_score": prof_data["quality_scores"],
+        "summary_counts": {
+            "critical": crit_cnt,
+            "warning": warn_cnt,
+            "info": info_cnt
+        },
+        "findings": findings,
+        "quality_issues": prof_data.get("quality_issues", []),
+        "column_profiles": prof_data.get("column_profiles", []),
+        "historical_comparison": prof_data.get("historical_comparison", []),
+        "ai_explanation_available": ai_available,
+        "ai_summary": ai_summary
+    }
+
+

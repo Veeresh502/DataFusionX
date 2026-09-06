@@ -373,7 +373,24 @@ export const aiService = {
     const response = await apiClient.get('/api/ai/health');
     return response.data;
   },
+
+  generatePipelineProposal: async (sourceId: number, userPrompt: string) => {
+    const response = await apiClient.post('/api/ai/generate-pipeline', {
+      source_id: sourceId,
+      user_prompt: userPrompt,
+    });
+    return response.data;
+  },
+
+  analyzeDataQuality: async (sourceId: number, targetModelSlug: string = 'generic') => {
+    const response = await apiClient.get(`/api/ai/data-quality/${sourceId}`, {
+      params: { target_model_slug: targetModelSlug }
+    });
+    return response.data;
+  },
 };
+
+
 
 
 

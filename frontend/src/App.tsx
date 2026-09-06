@@ -1,3 +1,4 @@
+// DataFusionX Master App Router (Updated for M13 AI Data Quality /data-quality)
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { LoginPage } from './pages/LoginPage';
@@ -14,6 +15,7 @@ import { WarehouseDashboardPage } from './pages/WarehouseDashboardPage';
 import { WarehouseTableDetailPage } from './pages/WarehouseTableDetailPage';
 import { TransformedDatasetsPage } from './pages/TransformedDatasetsPage';
 import { AICopilotPage } from './pages/AICopilotPage';
+import { AIDataQualityPage } from './pages/AIDataQualityPage';
 import { PipelineSchedulesPage } from './pages/PipelineSchedulesPage';
 
 import { MonitoringDashboardPage } from './pages/MonitoringDashboardPage';
@@ -77,6 +79,14 @@ export const App: React.FC = () => {
         />
         <Route
           path="/datasets/:id/profile"
+          element={
+            <ProtectedRoute>
+              <DataProfilePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/data-sources/:id/profile"
           element={
             <ProtectedRoute>
               <DataProfilePage />
@@ -148,8 +158,14 @@ export const App: React.FC = () => {
             </ProtectedRoute>
           }
         />
-
-
+        <Route
+          path="/data-quality"
+          element={
+            <ProtectedRoute>
+              <AIDataQualityPage />
+            </ProtectedRoute>
+          }
+        />
 
         <Route
           path="/warehouse"

@@ -449,6 +449,37 @@ export interface MonitoringOverview {
   schedule_summary: ScheduleMonitoringInfo;
 }
 
+export interface ProposalErrorItem {
+  type: string;
+  value?: string;
+  message: string;
+}
+
+export interface AIPipelineProposal {
+  proposed_name: string;
+  source_id: number;
+  source_name: string;
+  source_type: string;
+  detected_columns: string[];
+  steps: ETLStep[];
+  destination_config: PipelineDestinationConfig;
+  dag_nodes: DAGNode[];
+  dag_edges: DAGEdge[];
+  explanation: string;
+  step_reasons: { step: string; reason: string }[];
+  warnings: string[];
+  errors?: ProposalErrorItem[];
+  requested_operations?: string[];
+  resolved_operations?: string[];
+  unsupported_operations?: string[];
+  status?: 'VALID' | 'INVALID' | 'INCOMPLETE' | 'WARNING';
+  can_approve?: boolean;
+  confidence_score: number;
+  is_valid: boolean;
+}
+
+
+
 
 
 

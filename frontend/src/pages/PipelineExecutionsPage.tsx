@@ -20,11 +20,14 @@ import {
   Maximize2,
   Sparkles
 } from 'lucide-react';
+import { useToast } from '../components/Toast';
 
 
 export const PipelineExecutionsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const toast = useToast();
   const [pipeline, setPipeline] = useState<Pipeline | null>(null);
+
   const [executions, setExecutions] = useState<PipelineExecution[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedExecution, setSelectedExecution] = useState<PipelineExecution | null>(null);
@@ -34,12 +37,25 @@ export const PipelineExecutionsPage: React.FC = () => {
 
 
   const socketRef = useRef<WebSocket | null>(null);
+  const userClosedModalRef = useRef(false);
+  const initialLoadedRef = useRef(false);
 
   useEffect(() => {
     if (id) {
       fetchExecutions(Number(id));
     }
   }, [id]);
+
+  const handleCloseModal = () => {
+    userClosedModalRef.current = true;
+    setSelectedExecution(null);
+  };
+
+  const handleOpenExecution = (exec: PipelineExecution) => {
+    userClosedModalRef.current = false;
+    setSelectedExecution(exec);
+    setIsMinimized(false);
+  };
 
   const fetchExecutions = async (pipelineId: number) => {
     try {
@@ -50,10 +66,15 @@ export const PipelineExecutionsPage: React.FC = () => {
       setPipeline(pipeData);
       setExecutions(execList);
 
-      // Keep selectedExecution updated with the latest data from server
+      // Keep selectedExecution updated without force-opening if closed by user
       setSelectedExecution((prev) => {
         if (!prev) {
-          return execList.length > 0 ? execList[0] : null;
+          if (userClosedModalRef.current) return null;
+          if (!initialLoadedRef.current && execList.length > 0) {
+            initialLoadedRef.current = true;
+            return execList[0];
+          }
+          return null;
         }
         const match = execList.find((e) => e.id === prev.id);
         return match || prev;
@@ -64,6 +85,7 @@ export const PipelineExecutionsPage: React.FC = () => {
       setLoading(false);
     }
   };
+
 
   // Poll active executions every 2s
   useEffect(() => {
@@ -149,13 +171,15 @@ export const PipelineExecutionsPage: React.FC = () => {
     try {
       const newExecution = await pipelineService.runPipeline(Number(id));
       setExecutions((prev) => [newExecution, ...prev]);
-      setSelectedExecution(newExecution);
+      handleOpenExecution(newExecution);
+      toast.info('Execution Triggered', `Pipeline execution #${newExecution.id} initiated.`);
     } catch (err: any) {
-      alert(err.response?.data?.detail || 'Pipeline execution failed');
+      toast.error('Execution Failed', err.response?.data?.detail || 'Pipeline execution failed');
     } finally {
       setRunning(false);
     }
   };
+
 
   const getStatusBadge = (status: string, stage?: string, retryCount?: number) => {
     switch (status) {
@@ -321,8 +345,7 @@ export const PipelineExecutionsPage: React.FC = () => {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            setSelectedExecution(exec);
-                            setIsMinimized(false);
+                            handleOpenExecution(exec);
                           }}
                           className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-indigo-300 font-sans text-xs inline-flex items-center gap-1.5"
                         >
@@ -352,7 +375,7 @@ export const PipelineExecutionsPage: React.FC = () => {
                   <Minimize2 className="w-4 h-4" />
                 </button>
                 <button
-                  onClick={() => setSelectedExecution(null)}
+                  onClick={handleCloseModal}
                   title="Close Console"
                   className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors"
                 >
@@ -424,12 +447,13 @@ export const PipelineExecutionsPage: React.FC = () => {
                   <Maximize2 className="w-3.5 h-3.5" />
                 </button>
                 <button
-                  onClick={() => setSelectedExecution(null)}
+                  onClick={handleCloseModal}
                   title="Close Console"
                   className="p-1 rounded-md hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
+
               </div>
             </div>
 

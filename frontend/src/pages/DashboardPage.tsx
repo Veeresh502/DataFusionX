@@ -14,7 +14,8 @@ import {
   UserCheck, 
   Building, 
   Lock, 
-  Unlock 
+  Unlock,
+  ShieldAlert
 } from 'lucide-react';
 
 export const DashboardPage: React.FC = () => {
@@ -131,13 +132,22 @@ export const DashboardPage: React.FC = () => {
               </span>
             </div>
           </div>
-          <button
-            onClick={checkHealth}
-            className="self-start md:self-center inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm transition-colors shadow-lg shadow-indigo-600/20"
-          >
-            <RefreshCw className="w-4 h-4" />
-            <span>Check Status</span>
-          </button>
+          <div className="flex items-center gap-3 self-start md:self-center">
+            <button
+              onClick={() => navigate('/data-quality')}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white font-bold text-xs transition-all shadow-lg shadow-cyan-500/20"
+            >
+              <ShieldAlert className="w-4 h-4" />
+              <span>AI Data Quality & Anomaly Intelligence →</span>
+            </button>
+            <button
+              onClick={checkHealth}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm transition-colors shadow-lg shadow-indigo-600/20"
+            >
+              <RefreshCw className="w-4 h-4" />
+              <span>Check Status</span>
+            </button>
+          </div>
         </div>
 
         {/* Global Warning Banner if any backend service is unavailable */}

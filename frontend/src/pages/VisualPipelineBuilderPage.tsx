@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
+
 import {
   ReactFlow,
   MiniMap,
@@ -38,11 +39,14 @@ import {
   ShieldCheck,
   Sparkles
 } from 'lucide-react';
+import { useToast } from '../components/Toast';
 
 
 export const VisualPipelineBuilderPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const toast = useToast();
   const isNew = id === 'new' || !id;
 
   const [sources, setSources] = useState<DataSource[]>([]);
@@ -78,7 +82,15 @@ export const VisualPipelineBuilderPage: React.FC = () => {
       const srcList = await dataSourceService.listSources();
       setSources(srcList);
 
-      if (!isNew && id) {
+      const locationState = location.state as any;
+      if (locationState?.dag_nodes && locationState.dag_nodes.length > 0) {
+        if (locationState.proposed_name) setPipelineName(locationState.proposed_name);
+        else if (locationState.pipeline_name) setPipelineName(locationState.pipeline_name);
+        else setPipelineName('AI Generated Pipeline');
+
+        setNodes(locationState.dag_nodes);
+        setEdges(locationState.dag_edges || []);
+      } else if (!isNew && id) {
         const pipeData = await pipelineService.getPipeline(Number(id));
         setPipelineName(pipeData.name);
         setPipelineDesc(pipeData.description || '');
@@ -109,6 +121,7 @@ export const VisualPipelineBuilderPage: React.FC = () => {
         initNewDAG(srcList);
       }
     } catch (err) {
+
       console.error('Failed to load visual builder data', err);
     } finally {
       setLoading(false);
@@ -278,20 +291,60 @@ export const VisualPipelineBuilderPage: React.FC = () => {
       const res = await pipelineService.validateDAG(payload);
       setValidationResult(res);
       if (res.valid) {
-        alert('DAG Validation Successful! Graph has 0 cycles, 0 orphan nodes, and valid connections.');
+        toast.success('DAG Validation Successful', 'Graph has 0 cycles, 0 orphan nodes, and valid connections.');
+      } else {
+        toast.warning('DAG Validation Warnings', res.errors?.[0] || 'Graph topology issues detected');
       }
     } catch (err: any) {
       setValidationResult({
         valid: false,
         errors: [err.response?.data?.detail || 'DAG Validation error'],
       });
+      toast.error('DAG Validation Error', err.response?.data?.detail || 'DAG Validation failed');
     } finally {
       setValidating(false);
     }
   };
 
+  const validateNodeConfigurations = (): string[] => {
+    const configErrors: string[] = [];
+    nodes.forEach((n) => {
+      const data = n.data || {};
+      const cat = data.category || 'transformation';
+      const type = data.step_type || data.rule_type || data.node_type || n.type || '';
+      const label = data.label || type || n.id;
+
+      if (cat === 'transformation') {
+        if (type === 'filter_rows' && (!data.condition || !String(data.condition).trim())) {
+          configErrors.push(`Node '${label}': Filter condition is required.`);
+        }
+        if ((type === 'calculate_column' || type === 'derived_column') && (!data.target_column || !data.formula)) {
+          configErrors.push(`Node '${label}': Destination column and formula expression are required.`);
+        }
+      } else if (cat === 'validation') {
+        if (!data.column || !String(data.column).trim()) {
+          configErrors.push(`Node '${label}': Target column to validate is required.`);
+        }
+        if (data.rule_type === 'RANGE' && data.min_val === undefined && data.max_val === undefined && data.min_value === undefined && data.max_value === undefined) {
+          configErrors.push(`Node '${label}': Minimum or maximum value is required for Range Validation.`);
+        }
+        if (data.rule_type === 'REGEX' && (!data.pattern || !String(data.pattern).trim())) {
+          configErrors.push(`Node '${label}': Regex pattern is required.`);
+        }
+      }
+    });
+    return configErrors;
+  };
+
   const handleSavePipeline = async () => {
+    const configErrors = validateNodeConfigurations();
+    if (configErrors.length > 0) {
+      toast.error('Configuration Error', configErrors[0]);
+      return;
+    }
+
     setSaving(true);
+
     try {
       const dagNodesPayload = nodes.map((n) => ({
         id: n.id,
@@ -316,13 +369,14 @@ export const VisualPipelineBuilderPage: React.FC = () => {
 
       if (isNew) {
         const created = await pipelineService.createPipeline(payload);
+        toast.success('Pipeline Created', `Visual DAG Pipeline '${created.name}' created.`);
         navigate(`/pipelines/${created.id}`);
       } else {
         await pipelineService.updatePipeline(Number(id), payload);
-        alert('Visual DAG Pipeline saved successfully!');
+        toast.success('Pipeline Saved', 'Visual DAG Pipeline saved successfully.');
       }
     } catch (err: any) {
-      alert(err.response?.data?.detail || 'Failed to save pipeline');
+      toast.error('Save Failed', err.response?.data?.detail || 'Failed to save pipeline');
     } finally {
       setSaving(false);
     }
@@ -332,10 +386,10 @@ export const VisualPipelineBuilderPage: React.FC = () => {
     if (isNew || !id) return;
     try {
       const cloned = await pipelineService.clonePipeline(Number(id));
-      alert(`Pipeline cloned successfully as '${cloned.name}'!`);
+      toast.success('Pipeline Cloned', `Pipeline cloned successfully as '${cloned.name}'.`);
       navigate(`/pipelines/${cloned.id}`);
     } catch (err: any) {
-      alert(err.response?.data?.detail || 'Failed to clone pipeline');
+      toast.error('Clone Failed', err.response?.data?.detail || 'Failed to clone pipeline');
     }
   };
 
@@ -345,10 +399,14 @@ export const VisualPipelineBuilderPage: React.FC = () => {
     try {
       await handleSavePipeline();
       const exec = await pipelineService.runPipeline(Number(id));
-      alert(`Pipeline Execution Complete!\nStatus: ${exec.status}\nRecords Read: ${exec.records_read} | Processed: ${exec.records_processed}`);
+      if (exec.status === 'SUCCESS') {
+        toast.success('Execution Complete', `Status: SUCCESS | Read: ${exec.records_read} | Processed: ${exec.records_processed}`);
+      } else {
+        toast.error('Execution Failed', `Status: FAILED | ${exec.error || 'Validation or execution error'}`);
+      }
       navigate(`/pipelines/${id}/executions`);
     } catch (err: any) {
-      alert(err.response?.data?.detail || 'Pipeline execution failed');
+      toast.error('Execution Failed', err.response?.data?.detail || 'Pipeline execution failed');
     } finally {
       setRunning(false);
     }

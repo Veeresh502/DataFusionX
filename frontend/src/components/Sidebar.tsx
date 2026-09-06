@@ -1,6 +1,7 @@
+// DataFusionX Navigation Sidebar Component (Updated for M13 AI Data Quality)
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Layers, Database, GitCommit, Server, Calendar, Activity, Bot } from 'lucide-react';
+import { LayoutDashboard, Layers, Database, GitCommit, Server, Calendar, Activity, Bot, ShieldAlert } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
   return (
@@ -14,8 +15,8 @@ export const Sidebar: React.FC = () => {
           <h1 className="font-bold text-lg tracking-wider bg-gradient-to-r from-white via-slate-200 to-indigo-300 bg-clip-text text-transparent">
             DataFusionX
           </h1>
-          <span className="text-[10px] font-medium tracking-widest text-indigo-400 uppercase">
-            Platform v0.6
+          <span className="text-[10px] font-medium tracking-widest text-cyan-400 uppercase">
+            Platform v1.3 (M13)
           </span>
         </div>
       </div>
@@ -120,6 +121,20 @@ export const Sidebar: React.FC = () => {
         </NavLink>
 
         <NavLink
+          to="/data-quality"
+          className={({ isActive }) =>
+            `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+              isActive
+                ? 'bg-cyan-600/20 text-cyan-300 border border-cyan-500/30 shadow-inner'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+            }`
+          }
+        >
+          <ShieldAlert className="w-4 h-4 text-cyan-400" />
+          <span>AI Data Quality</span>
+        </NavLink>
+
+        <NavLink
           to="/warehouse"
           className={({ isActive }) =>
             `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
@@ -134,13 +149,11 @@ export const Sidebar: React.FC = () => {
         </NavLink>
       </nav>
 
-
-
       {/* Footer Info */}
       <div className="p-4 border-t border-slate-800/80 text-xs text-slate-500 flex items-center justify-between">
-        <span>Milestone 6</span>
-        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-indigo-950/60 text-indigo-400 border border-indigo-800/40 font-mono text-[10px]">
-          Data Warehouse
+        <span>Milestone 13</span>
+        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-cyan-950/60 text-cyan-400 border border-cyan-800/40 font-mono text-[10px]">
+          AI Data Quality
         </span>
       </div>
     </aside>

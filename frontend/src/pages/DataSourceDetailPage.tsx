@@ -11,11 +11,13 @@ import {
   Trash2,
   Activity
 } from 'lucide-react';
+import { useToast } from '../components/Toast';
 
 
 export const DataSourceDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const toast = useToast();
   const [source, setSource] = useState<DataSource | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'preview' | 'schema'>('preview');
@@ -42,9 +44,10 @@ export const DataSourceDetailPage: React.FC = () => {
     if (!source || !window.confirm(`Delete data source "${source.name}"?`)) return;
     try {
       await dataSourceService.deleteSource(source.id);
+      toast.success('Data Source Deleted', `Data source "${source.name}" removed successfully.`);
       navigate('/data-sources');
     } catch (err: any) {
-      alert(err.response?.data?.detail || 'Failed to delete data source');
+      toast.error('Delete Failed', err.response?.data?.detail || 'Failed to delete data source');
     }
   };
 

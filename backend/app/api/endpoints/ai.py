@@ -5,9 +5,17 @@ from app.models.user import User
 from app.schemas.ai import (
     AIQueryRequest, AIQueryResponse,
     AIPipelineExplainRequest, AIPipelineExplainResponse,
-    AIHealthResponse
+    AIHealthResponse,
+    AIPipelineGenerateRequest, AIPipelineProposalResponse
 )
-from app.services.ai_service import process_natural_language_query, explain_pipeline_failure_service
+from app.schemas.data_quality import DataQualityAnalysisResponse
+from app.services.ai_service import (
+    process_natural_language_query,
+    explain_pipeline_failure_service,
+    generate_pipeline_proposal_service,
+    analyze_data_quality_service
+)
+
 from app.services.sql_safety import SQLSafetyError
 from app.core.config import settings
 
@@ -99,3 +107,77 @@ def ai_health_endpoint(
         provider=provider,
         model=settings.LLM_MODEL_NAME if provider == "openai" else "mock-heuristic-engine"
     )
+
+
+@router.post("/generate-pipeline", response_model=AIPipelineProposalResponse)
+def generate_pipeline_endpoint(
+    req: AIPipelineGenerateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> AIPipelineProposalResponse:
+    """
+    AI Pipeline Copilot:
+    Translates natural language ETL requirements into a structured, validated pipeline proposal.
+    Inspects actual dataset schema for tenant isolation, checks hallucinated columns, and returns
+    M7-compatible visual DAG nodes/edges ready for user review and approval.
+    """
+    if not req.user_prompt or not req.user_prompt.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="ETL requirement prompt cannot be empty."
+        )
+
+    try:
+        res = generate_pipeline_proposal_service(
+            db=db,
+            user=current_user,
+            source_id=req.source_id,
+            user_prompt=req.user_prompt.strip()
+        )
+        return AIPipelineProposalResponse(**res)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"AI Pipeline Copilot error: {str(e)}"
+        )
+
+
+@router.get("/data-quality/{source_id}", response_model=DataQualityAnalysisResponse)
+def analyze_data_quality_endpoint(
+    source_id: int,
+    target_model_slug: str = "generic",
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> DataQualityAnalysisResponse:
+    """
+    M13 AI Data Quality & Anomaly Intelligence:
+    Calculates deterministic profiling metrics, detects anomalies (NULL spikes, duplicate keys,
+    numeric outliers, text casing inconsistencies, format errors, schema mismatches),
+    computes deterministic Quality Score (0-100), and provides AI explanations & recommendations.
+    Enforces multi-tenant tenant isolation.
+    """
+    try:
+        res = analyze_data_quality_service(
+            db=db,
+            user=current_user,
+            source_id=source_id,
+            target_model_slug=target_model_slug
+        )
+        return DataQualityAnalysisResponse(**res)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"AI Data Quality error: {str(e)}"
+        )
+
+

@@ -39,6 +39,21 @@ def publish_execution_event(execution_id: int, event_type: str, data: dict):
         print(f"[Redis Event Publish Warning] Could not publish event: {e}")
 
 
+def _is_validation_step(s: dict) -> bool:
+    cat = str(s.get("category") or "").lower()
+    tp = str(s.get("type") or s.get("node_type") or "").lower()
+    rule_tp = str(s.get("rule_type") or "").lower()
+    
+    if cat == "validation" or cat == "val":
+        return True
+    if cat == "transformation":
+        return False
+        
+    val_rules = ["not_null", "unique", "primary_key", "range", "regex"]
+    return any(r in tp for r in val_rules) or any(r in rule_tp for r in val_rules)
+
+
+
 @celery_app.task(bind=True, max_retries=3)
 def execute_pipeline_task(self, execution_id: int, db: Optional[Session] = None):
     """
@@ -116,12 +131,50 @@ def execute_pipeline_task(self, execution_id: int, db: Optional[Session] = None)
         publish_execution_event(execution_id, "STAGE_STARTED", {"stage": "TRANSFORM"})
 
         steps = pipeline.steps or []
-        transform_steps = [s for s in steps if s.get("category") != "validation"]
-        validation_steps = [s for s in steps if s.get("category") == "validation"]
+        transform_steps = [s for s in steps if not _is_validation_step(s)]
+        validation_steps = [s for s in steps if _is_validation_step(s)]
 
         t2 = time.time()
-        transformed_df = transform_dataframe(extracted_df, transform_steps, logger)
+        try:
+            transformed_df = transform_dataframe(extracted_df, transform_steps, logger)
+        except Exception as tf_err:
+            logger.error(f"Transformation failed: {str(tf_err)}")
+            logger.info("Validation skipped because transformation failed")
+            logger.info("Load skipped because transformation failed")
+            execution.records_processed = 0
+            execution.records_failed = 0
+            execution.records_loaded = 0
+            execution.status = "FAILED"
+            execution.current_stage = "FAILED"
+            execution.error = f"Transformation Failure: {str(tf_err)}"
+            execution.completed_at = datetime.now(timezone.utc)
+            duration = round(time.time() - start_time, 3)
+            execution.duration_seconds = duration
+            execution.logs = logger.logs
+            db.commit()
+
+            try:
+                from app.core.prometheus import PIPELINE_FAILURES_TOTAL
+                PIPELINE_FAILURES_TOTAL.inc()
+            except Exception:
+                pass
+
+            publish_execution_event(execution_id, "EXECUTION_FAILED", {
+                "status": "FAILED",
+                "current_stage": "FAILED",
+                "records_read": execution.records_read,
+                "records_processed": 0,
+                "records_failed": 0,
+                "records_loaded": 0,
+                "duration_seconds": execution.duration_seconds,
+                "error": execution.error,
+                "logs": logger.logs
+            })
+
+            return {"status": "FAILED", "execution_id": execution_id, "error": execution.error}
+
         t3 = time.time()
+
         execution.logs = logger.logs
         db.commit()
 
@@ -172,6 +225,39 @@ def execute_pipeline_task(self, execution_id: int, db: Optional[Session] = None)
             "records_failed": len(invalid_df),
             "logs": logger.logs
         })
+
+        # CHECK VALIDATION FAILURE -> BLOCK LOAD & MARK EXECUTION FAILED
+        if validation_errors or len(invalid_df) > 0:
+            err_summary = validation_errors[0] if validation_errors else f"Validation failed with {len(invalid_df)} invalid records."
+            execution.records_loaded = 0
+            execution.status = "FAILED"
+            execution.current_stage = "FAILED"
+            execution.error = f"Validation Failure: {err_summary}"
+            execution.completed_at = datetime.now(timezone.utc)
+            duration = round(time.time() - start_time, 3)
+            execution.duration_seconds = duration
+            execution.logs = logger.logs
+            db.commit()
+
+            try:
+                from app.core.prometheus import PIPELINE_FAILURES_TOTAL
+                PIPELINE_FAILURES_TOTAL.inc()
+            except Exception:
+                pass
+
+            publish_execution_event(execution_id, "EXECUTION_FAILED", {
+                "status": "FAILED",
+                "current_stage": "FAILED",
+                "records_read": execution.records_read,
+                "records_processed": execution.records_processed,
+                "records_failed": execution.records_failed,
+                "records_loaded": 0,
+                "duration_seconds": execution.duration_seconds,
+                "error": execution.error,
+                "logs": logger.logs
+            })
+
+            return {"status": "FAILED", "execution_id": execution_id, "error": execution.error}
 
         # STAGE 4: LOAD
         execution.current_stage = "LOAD"
@@ -229,6 +315,7 @@ def execute_pipeline_task(self, execution_id: int, db: Optional[Session] = None)
         })
 
         return {"status": execution.status, "execution_id": execution_id}
+
 
 
     except (OperationalError, DatabaseError, ConnectionError) as exc:

@@ -108,8 +108,8 @@ def get_pipeline_overview(db: Session, organization_id: int) -> Dict[str, Any]:
 
 
 def get_pipeline_failures(db: Session, organization_id: int) -> List[Dict[str, Any]]:
-    pipe_org_count = db.query(PipelineExecution).filter(PipelineExecution.organization_id == organization_id).count()
-    pipe_org_filter = (Pipeline.organization_id == organization_id) if pipe_org_count > 0 else True
+    pipe_org_filter = (Pipeline.organization_id == organization_id)
+
 
     failure_stats = db.query(
         Pipeline.id.label("pipeline_id"),

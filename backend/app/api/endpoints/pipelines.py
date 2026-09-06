@@ -76,6 +76,53 @@ def create_pipeline(
             detail="source_id is required or must be configured in DAG Source node"
         )
 
+    supported_transformations = {
+        "remove_duplicates", "deduplicate", "fill_null", "fill_missing", "trim_text",
+        "normalize_text", "filter_rows", "calculate_column", "derived_column",
+        "rename_columns", "change_data_types", "drop_null"
+    }
+
+    supported_validations = {"not_null", "unique", "range", "regex"}
+
+    # Validate step parameters & registry prior to saving
+    for step in steps:
+        cat = str(step.get("category", "")).lower()
+        st_type = str(step.get("type", "")).lower()
+
+        if cat == "transformation":
+            if st_type not in supported_transformations:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Unsupported transformation: '{st_type}'."
+                )
+            if st_type in ["calculate_column", "derived_column"]:
+                col = step.get("column") or step.get("target_column")
+                expr = step.get("expression") or step.get("formula")
+                if not col or not expr or step.get("is_incomplete"):
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Step 'calculate_column' is missing required destination column or expression."
+                    )
+            elif st_type == "filter_rows" and not step.get("condition"):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Step 'filter_rows' requires a filter condition."
+                )
+        elif cat == "validation":
+            rule_tp = str(step.get("rule_type") or st_type).lower()
+            if rule_tp not in supported_validations:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Unsupported validation rule: '{rule_tp}'."
+                )
+            if not step.get("column"):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Validation step '{step.get('rule_type', 'VALIDATION')}' requires a target column."
+                )
+
+
+
     pipeline = Pipeline(
         name=data.name,
         description=data.description,

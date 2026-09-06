@@ -12,10 +12,14 @@ import {
   RefreshCw
 } from 'lucide-react';
 
+import { useToast } from '../components/Toast';
+
 export const PipelineConfigPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const toast = useToast();
   const isNew = id === 'new' || !id;
+
 
   const [sources, setSources] = useState<DataSource[]>([]);
   const [warehouseModels, setWarehouseModels] = useState<WarehouseModel[]>([]);
@@ -144,10 +148,12 @@ export const PipelineConfigPage: React.FC = () => {
     e.preventDefault();
     if (!pipelineName || !selectedSourceId) {
       setErrorMsg('Pipeline Name and Source Dataset are required');
+      toast.warning('Missing Required Fields', 'Pipeline Name and Source Dataset are required.');
       return;
     }
     if (destinationType === 'POSTGRES_TABLE' && !targetTable) {
       setErrorMsg('Destination Table Name is required for Flat PostgreSQL Table');
+      toast.warning('Missing Target Table', 'Destination Table Name is required.');
       return;
     }
 
@@ -165,13 +171,16 @@ export const PipelineConfigPage: React.FC = () => {
     try {
       if (isNew) {
         const created = await pipelineService.createPipeline(payload);
+        toast.success('Pipeline Created', `Pipeline '${created.name}' created successfully.`);
         navigate(`/pipelines/${created.id}`);
       } else {
         await pipelineService.updatePipeline(Number(id), payload);
-        alert('Pipeline updated successfully!');
+        toast.success('Pipeline Updated', 'Pipeline configuration saved successfully.');
       }
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.detail || 'Failed to save pipeline');
+      const msg = err.response?.data?.detail || 'Failed to save pipeline';
+      setErrorMsg(msg);
+      toast.error('Save Failed', msg);
     } finally {
       setSaving(false);
     }
@@ -180,10 +189,12 @@ export const PipelineConfigPage: React.FC = () => {
   const handleSaveAndRun = async () => {
     if (!pipelineName || !selectedSourceId) {
       setErrorMsg('Pipeline Name and Source Dataset are required');
+      toast.warning('Missing Required Fields', 'Pipeline Name and Source Dataset are required.');
       return;
     }
     if (destinationType === 'POSTGRES_TABLE' && !targetTable) {
       setErrorMsg('Destination Table Name is required for Flat PostgreSQL Table');
+      toast.warning('Missing Target Table', 'Destination Table Name is required.');
       return;
     }
 
@@ -208,10 +219,17 @@ export const PipelineConfigPage: React.FC = () => {
       }
 
       const exec = await pipelineService.runPipeline(pipeId);
-      alert(`Pipeline Run Complete!\nStatus: ${exec.status}\nRead: ${exec.records_read} | Processed: ${exec.records_processed} | Loaded: ${exec.records_loaded ?? 'N/A'} | Duration: ${exec.duration_seconds}s`);
+      if (exec.status === 'SUCCESS') {
+        toast.success('Pipeline Execution Complete', `Status: ${exec.status} | Read: ${exec.records_read} | Processed: ${exec.records_processed} | Loaded: ${exec.records_loaded ?? 0}`);
+      } else {
+        toast.error('Pipeline Execution Failed', `Status: ${exec.status} | ${exec.error || 'Validation or execution failed'}`);
+      }
+
       navigate(`/pipelines/${pipeId}/executions`);
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.detail || 'Pipeline run failed');
+      const msg = err.response?.data?.detail || 'Pipeline run failed';
+      setErrorMsg(msg);
+      toast.error('Pipeline Run Failed', msg);
     } finally {
       setRunning(false);
     }
@@ -507,9 +525,11 @@ export const PipelineConfigPage: React.FC = () => {
                       ))
                     ) : (
                       <>
-                        <option value={1}>Sales Analytics (SALES)</option>
-                        <option value={2}>Manufacturing Analytics (MANUFACTURING)</option>
+                        <option value={1}>Generic Warehouse (GENERIC)</option>
+                        <option value={2}>Sales Analytics (SALES)</option>
+                        <option value={3}>Manufacturing Analytics (MANUFACTURING)</option>
                       </>
+
                     )}
                   </select>
                 </div>

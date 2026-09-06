@@ -43,7 +43,8 @@ export const WarehouseDashboardPage: React.FC = () => {
   const toast = useToast();
   const navigate = useNavigate();
   const [models, setModels] = useState<WarehouseModel[]>([]);
-  const [selectedModelSlug, setSelectedModelSlug] = useState<string>('sales');
+  const [selectedModelSlug, setSelectedModelSlug] = useState<string>('generic');
+
   const [tables, setTables] = useState<WarehouseTableSummary[]>([]);
   const [salesAnalytics, setSalesAnalytics] = useState<RevenueMetrics | null>(null);
   const [mfgAnalytics, setMfgAnalytics] = useState<ManufacturingMetrics | null>(null);
@@ -248,6 +249,9 @@ export const WarehouseDashboardPage: React.FC = () => {
                   ))
                 ) : (
                   <>
+                    <option value="generic" className="bg-slate-900 text-slate-200">
+                      Generic Warehouse (GENERIC)
+                    </option>
                     <option value="sales" className="bg-slate-900 text-slate-200">
                       Sales Analytics (SALES)
                     </option>
@@ -255,6 +259,7 @@ export const WarehouseDashboardPage: React.FC = () => {
                       Manufacturing Analytics (MANUFACTURING)
                     </option>
                   </>
+
                 )}
 
               </select>

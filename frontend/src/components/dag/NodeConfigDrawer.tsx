@@ -228,7 +228,9 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
             {nodeType === 'calculate_column' && (
               <>
                 <div>
-                  <label className="block text-[10px] font-semibold text-slate-400 uppercase mb-1">Target Derived Column</label>
+                  <label className="block text-[10px] font-semibold text-slate-400 uppercase mb-1">
+                    Target Derived Column <span className="text-rose-400">*</span>
+                  </label>
                   <input
                     type="text"
                     placeholder="e.g. total_revenue"
@@ -238,7 +240,9 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-semibold text-slate-400 uppercase mb-1">Formula Expression</label>
+                  <label className="block text-[10px] font-semibold text-slate-400 uppercase mb-1">
+                    Formula Expression <span className="text-rose-400">*</span>
+                  </label>
                   <input
                     type="text"
                     placeholder="e.g. quantity * unit_price - discount"
@@ -253,7 +257,9 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
 
             {nodeType === 'fill_null' && (
               <div>
-                <label className="block text-[10px] font-semibold text-slate-400 uppercase mb-1">Fill Value</label>
+                <label className="block text-[10px] font-semibold text-slate-400 uppercase mb-1">
+                  Fill Value <span className="text-slate-500 font-normal">(Optional, default: "")</span>
+                </label>
                 <input
                   type="text"
                   placeholder="e.g. Unknown or 0"
@@ -281,7 +287,9 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
 
             {nodeType === 'filter_rows' && (
               <div>
-                <label className="block text-[10px] font-semibold text-slate-400 uppercase mb-1">Filter Query Condition</label>
+                <label className="block text-[10px] font-semibold text-slate-400 uppercase mb-1">
+                  Filter Query Condition <span className="text-rose-400">*</span>
+                </label>
                 <input
                   type="text"
                   placeholder="e.g. age >= 18 and status == 'active'"
@@ -297,7 +305,9 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
         {category === 'validation' && (
           <div className="space-y-4">
             <div>
-              <label className="block text-[10px] font-semibold text-slate-400 uppercase mb-1">Column to Validate</label>
+              <label className="block text-[10px] font-semibold text-slate-400 uppercase mb-1">
+                Column to Validate <span className="text-rose-400">*</span>
+              </label>
               <input
                 type="text"
                 placeholder="Column name"
@@ -306,6 +316,7 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
                 className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-200 font-mono"
               />
             </div>
+
 
             {data.rule_type === 'RANGE' && (
               <div className="grid grid-cols-2 gap-2">
@@ -393,9 +404,11 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
                     ))
                   ) : (
                     <>
+                      <option value="generic">Generic Warehouse (GENERIC)</option>
                       <option value="sales">Sales Analytics (SALES)</option>
                       <option value="manufacturing">Manufacturing Analytics (MANUFACTURING)</option>
                     </>
+
                   )}
 
                 </select>

@@ -117,14 +117,51 @@ def validate_and_compile_dag(
             continue
 
         n_data = n.get("data", {})
-        category = n.get("category") or n_data.get("category", "transformation")
-        step_type = n_data.get("step_type") or n.get("type")
+        node_type = str(n.get("type") or n_data.get("node_type") or "").lower()
+        step_type = str(n_data.get("step_type") or n_data.get("rule_type") or n.get("type") or "").lower()
+        raw_cat = str(n.get("category") or n_data.get("category") or "").lower()
+
+        # Assign category for validation vs transformation nodes
+        is_val_node = (
+            raw_cat == "validation"
+            or "validation" in node_type
+            or (any(r in step_type for r in ["not_null", "unique", "primary_key", "range", "regex"]) and raw_cat != "transformation")
+        )
+        category = "validation" if is_val_node else (raw_cat or "transformation")
+
+        orig_type = n_data.get("step_type") or n.get("type") or step_type
+        
+        # Configuration Validation
+        if category == "transformation":
+            if step_type == "filter_rows" and not n_data.get("condition"):
+                errors.append(f"Node '{n_data.get('label', 'Filter Rows')}' requires a filter condition.")
+            elif step_type in ["calculate_column", "derived_column"] and (not n_data.get("target_column") or not n_data.get("formula")):
+                errors.append(f"Node '{n_data.get('label', 'Calculate Column')}' requires a destination column and formula.")
+            elif step_type == "rename_columns" and not n_data.get("mapping"):
+                errors.append(f"Node '{n_data.get('label', 'Rename Columns')}' requires column mapping.")
+            elif step_type == "change_data_types" and not n_data.get("mapping"):
+                errors.append(f"Node '{n_data.get('label', 'Change Data Types')}' requires data type mapping.")
+        elif category == "validation":
+            if not n_data.get("column"):
+                errors.append(f"Node '{n_data.get('label', 'Validation')}' requires a target column.")
+            rule_tp = str(n_data.get("rule_type") or str(orig_type).upper()).upper()
+            if rule_tp == "RANGE" and n_data.get("min_val") is None and n_data.get("max_val") is None and n_data.get("min_value") is None and n_data.get("max_value") is None:
+                errors.append(f"Node '{n_data.get('label', 'Range Validation')}' requires at least a minimum or maximum value.")
+            elif rule_tp == "REGEX" and not n_data.get("pattern"):
+                errors.append(f"Node '{n_data.get('label', 'Regex Validation')}' requires a regex pattern.")
 
         step_dict = {
             "category": category,
-            "type": step_type,
+            "type": orig_type,
+            **({"rule_type": n_data.get("rule_type") or str(orig_type).upper()} if category == "validation" else {}),
             **{k: v for k, v in n_data.items() if k not in ["label", "node_type", "category", "step_type"]}
         }
         compiled_steps.append(step_dict)
 
+
+    if errors:
+        return False, errors, [], None, {}
+
     return True, [], compiled_steps, source_id, destination_config
+
+

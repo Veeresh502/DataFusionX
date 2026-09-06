@@ -437,12 +437,32 @@ def get_warehouse_analytics(db: Session) -> Dict[str, Any]:
 
 # --- GENERIC WAREHOUSE MODEL INITIALIZATION & SEEDING ---
 def ensure_default_warehouse_models(db: Session, organization_id: int):
-    """Ensures default Sales Analytics and Manufacturing Analytics models exist for an organization."""
+    """Ensures default Generic Warehouse, Sales Analytics, and Manufacturing Analytics models exist for an organization."""
+    # 0. Generic Warehouse Model
+    generic_model = db.query(WarehouseModel).filter(
+        WarehouseModel.organization_id == organization_id,
+        WarehouseModel.slug == "generic"
+    ).first()
+
+    if not generic_model:
+        generic_model = WarehouseModel(
+            organization_id=organization_id,
+            name="Generic Warehouse",
+            slug="generic",
+            domain="GENERIC",
+            description="General-Purpose Enterprise Warehouse for user-defined datasets, flat tables, and arbitrary enterprise data",
+            is_active=True,
+        )
+        db.add(generic_model)
+        db.commit()
+        db.refresh(generic_model)
+
     # 1. Sales Model
     sales_model = db.query(WarehouseModel).filter(
         WarehouseModel.organization_id == organization_id,
         WarehouseModel.slug == "sales"
     ).first()
+
 
     if not sales_model:
         sales_model = WarehouseModel(
@@ -596,8 +616,41 @@ def load_dataframe_to_warehouse(
 
     if target_slug in ["manufacturing", "mfg"]:
         return load_dataframe_to_manufacturing_warehouse(db, df)
-    else:
+    elif target_slug in ["sales", "sales_analytics"]:
         return load_dataframe_to_sales_warehouse(db, df)
+    else:
+        # Generic Warehouse -> Load directly into user-selected destination table
+        table_name = str(dest_config.get("table_name", "transformed_output")).strip()
+        if_exists = dest_config.get("if_exists", "append")
+
+        engine = db.bind if db and hasattr(db, "bind") and db.bind else create_engine(settings.DATABASE_URL)
+
+
+        with engine.begin() as conn:
+            inspector = inspect(conn)
+            table_exists = inspector.has_table(table_name)
+            if table_exists:
+                if if_exists == "replace":
+                    conn.execute(text(f'DROP TABLE IF EXISTS "{table_name}"'))
+                elif if_exists == "append":
+                    existing_cols = {c["name"] for c in inspector.get_columns(table_name)}
+
+                    for col in df.columns:
+                        if col not in existing_cols:
+                            sql_type = "VARCHAR"
+                            if pd.api.types.is_integer_dtype(df[col]):
+                                sql_type = "INTEGER"
+                            elif pd.api.types.is_float_dtype(df[col]):
+                                sql_type = "DOUBLE PRECISION"
+                            elif pd.api.types.is_datetime64_any_dtype(df[col]):
+                                sql_type = "TIMESTAMP"
+                            elif pd.api.types.is_bool_dtype(df[col]):
+                                sql_type = "BOOLEAN"
+                            conn.execute(text(f'ALTER TABLE "{table_name}" ADD COLUMN IF NOT EXISTS "{col}" {sql_type}'))
+
+        df.to_sql(name=table_name, con=engine, if_exists=if_exists if if_exists != "replace" else "append", index=False)
+        return len(df)
+
 
 
 # --- MANUFACTURING DOMAIN LOADER ---
@@ -778,13 +831,17 @@ def get_warehouse_models_list(db: Session, organization_id: int) -> List[Warehou
         WarehouseModel.is_active == True
     ).order_by(WarehouseModel.id.asc()).all()
 
+    priority = {"generic": 0, "sales": 1, "manufacturing": 2}
+    sorted_models = sorted(models, key=lambda x: priority.get(x.slug.lower(), 99))
+
     seen_slugs = set()
     unique_models = []
-    for m in models:
+    for m in sorted_models:
         if m.slug.lower() not in seen_slugs:
             seen_slugs.add(m.slug.lower())
             unique_models.append(m)
     return unique_models
+
 
 
 
@@ -926,7 +983,9 @@ def get_warehouse_tables_summary(db: Session, model_slug_or_id: Optional[Any] = 
 
     if model_slug_or_id:
         slug_str = str(model_slug_or_id).lower()
-        if slug_str in ["sales", "sales_analytics"]:
+        if slug_str in ["generic", "flat"]:
+            return get_flat_transformed_datasets(db)
+        elif slug_str in ["sales", "sales_analytics"]:
             allowed = ["fact_sales", "dim_customer", "dim_product", "dim_location", "dim_date"]
         elif slug_str in ["manufacturing", "mfg"]:
             allowed = ["fact_production", "dim_machine", "dim_plant", "dim_date"]
@@ -934,6 +993,7 @@ def get_warehouse_tables_summary(db: Session, model_slug_or_id: Optional[Any] = 
             allowed = [t["table_name"] for t in tables_map]
     else:
         allowed = [t["table_name"] for t in tables_map]
+
 
     result = []
     for t in tables_map:

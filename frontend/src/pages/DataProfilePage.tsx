@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { MainLayout } from '../layouts/MainLayout';
 import { dataSourceService } from '../services/api';
 import { DataProfile, DataSource, ColumnProfile } from '../types';
+import { formatPercentage, formatNumber, formatMemoryBytes, getQualityBadgeColor } from '../utils/formatters';
 import { 
   BarChart, 
   Bar, 
@@ -21,9 +22,11 @@ import {
   ShieldCheck, 
   RefreshCw, 
   PieChart as PieChartIcon,
-  BarChart2
+  BarChart2,
+  AlertTriangle,
+  Database,
+  CheckCircle2
 } from 'lucide-react';
-
 
 export const DataProfilePage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -42,6 +45,9 @@ export const DataProfilePage: React.FC = () => {
   const fetchProfileData = async (datasetId: number) => {
     setLoading(true);
     setErrorMsg(null);
+    setProfile(null);
+    setSource(null);
+    setSelectedColumn(null);
     try {
       const [profData, sourceData] = await Promise.all([
         dataSourceService.getDatasetProfile(datasetId),
@@ -85,6 +91,7 @@ export const DataProfilePage: React.FC = () => {
   }
 
   const { summary, quality_scores, column_profiles } = profile;
+  const qualityIssues = (profile as any).quality_issues || [];
 
   // Chart Data Preparation: Null % and Unique % per column
   const columnOverviewChartData = column_profiles.map((col) => ({
@@ -93,12 +100,6 @@ export const DataProfilePage: React.FC = () => {
     'Null %': col.null_percentage,
     'Unique %': col.unique_percentage,
   }));
-
-  const getQualityBadgeColor = (score: number) => {
-    if (score >= 85) return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
-    if (score >= 60) return 'text-amber-400 bg-amber-500/10 border-amber-500/20';
-    return 'text-rose-400 bg-rose-500/10 border-rose-500/20';
-  };
 
   return (
     <MainLayout>
@@ -124,9 +125,17 @@ export const DataProfilePage: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-3">
-            <span className={`px-3 py-1.5 rounded-xl border text-xs font-bold font-mono flex items-center gap-2 ${getQualityBadgeColor(quality_scores.overall)}`}>
+            <Link
+              to="/data-quality"
+              state={{ sourceId: source.id }}
+              className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white text-xs font-bold font-mono shadow-lg shadow-indigo-500/20 flex items-center gap-2 transition-all"
+            >
               <ShieldCheck className="w-4 h-4" />
-              <span>Quality Score: {quality_scores.overall}%</span>
+              <span>Open AI Data Quality Intelligence →</span>
+            </Link>
+            <span className={`px-3 py-1.5 rounded-xl border text-xs font-bold font-mono flex items-center gap-2 ${getQualityBadgeColor(quality_scores?.overall ?? (quality_scores as any)?.score)}`}>
+              <ShieldCheck className="w-4 h-4" />
+              <span>Quality Score: {formatPercentage(quality_scores?.overall ?? (quality_scores as any)?.score)}</span>
             </span>
           </div>
         </div>
@@ -135,22 +144,22 @@ export const DataProfilePage: React.FC = () => {
         <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="glass-card p-5 rounded-2xl border border-slate-800">
             <span className="text-[11px] text-slate-500 font-medium uppercase tracking-wider block">Total Rows</span>
-            <span className="text-2xl font-bold font-mono text-white mt-1 block">{summary.row_count.toLocaleString()}</span>
+            <span className="text-2xl font-bold font-mono text-white mt-1 block">{formatNumber(summary?.row_count)}</span>
           </div>
           <div className="glass-card p-5 rounded-2xl border border-slate-800">
             <span className="text-[11px] text-slate-500 font-medium uppercase tracking-wider block">Total Columns</span>
-            <span className="text-2xl font-bold font-mono text-indigo-300 mt-1 block">{summary.column_count}</span>
+            <span className="text-2xl font-bold font-mono text-indigo-300 mt-1 block">{formatNumber(summary?.column_count)}</span>
           </div>
           <div className="glass-card p-5 rounded-2xl border border-slate-800">
             <span className="text-[11px] text-slate-500 font-medium uppercase tracking-wider block">Duplicate Rows</span>
-            <span className={`text-2xl font-bold font-mono mt-1 block ${summary.duplicate_rows > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
-              {summary.duplicate_rows}
+            <span className={`text-2xl font-bold font-mono mt-1 block ${(summary?.duplicate_rows || 0) > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
+              {formatNumber(summary?.duplicate_rows)}
             </span>
           </div>
           <div className="glass-card p-5 rounded-2xl border border-slate-800">
             <span className="text-[11px] text-slate-500 font-medium uppercase tracking-wider block">Estimated Memory</span>
             <span className="text-2xl font-bold font-mono text-cyan-300 mt-1 block">
-              {(summary.memory_bytes / 1024).toFixed(1)} KB
+              {formatMemoryBytes(summary?.memory_bytes)}
             </span>
           </div>
         </section>
@@ -166,10 +175,10 @@ export const DataProfilePage: React.FC = () => {
             <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-2">
               <div className="flex justify-between items-center text-xs">
                 <span className="text-slate-400 font-medium">Completeness</span>
-                <span className="font-mono font-bold text-emerald-400">{quality_scores.completeness}%</span>
+                <span className="font-mono font-bold text-emerald-400">{formatPercentage(quality_scores?.completeness)}</span>
               </div>
               <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-                <div className="bg-emerald-500 h-full transition-all duration-500" style={{ width: `${quality_scores.completeness}%` }} />
+                <div className="bg-emerald-500 h-full transition-all duration-500" style={{ width: `${quality_scores?.completeness ?? 0}%` }} />
               </div>
               <p className="text-[11px] text-slate-500">Ratio of non-null populated cells across all columns</p>
             </div>
@@ -177,10 +186,10 @@ export const DataProfilePage: React.FC = () => {
             <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-2">
               <div className="flex justify-between items-center text-xs">
                 <span className="text-slate-400 font-medium">Uniqueness</span>
-                <span className="font-mono font-bold text-indigo-400">{quality_scores.uniqueness}%</span>
+                <span className="font-mono font-bold text-indigo-400">{formatPercentage(quality_scores?.uniqueness)}</span>
               </div>
               <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-                <div className="bg-indigo-500 h-full transition-all duration-500" style={{ width: `${quality_scores.uniqueness}%` }} />
+                <div className="bg-indigo-500 h-full transition-all duration-500" style={{ width: `${quality_scores?.uniqueness ?? 0}%` }} />
               </div>
               <p className="text-[11px] text-slate-500">Percentage of non-duplicate records in dataset</p>
             </div>
@@ -188,10 +197,10 @@ export const DataProfilePage: React.FC = () => {
             <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-2">
               <div className="flex justify-between items-center text-xs">
                 <span className="text-slate-400 font-medium">Validity</span>
-                <span className="font-mono font-bold text-cyan-400">{quality_scores.validity}%</span>
+                <span className="font-mono font-bold text-cyan-400">{formatPercentage(quality_scores?.validity)}</span>
               </div>
               <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-                <div className="bg-cyan-500 h-full transition-all duration-500" style={{ width: `${quality_scores.validity}%` }} />
+                <div className="bg-cyan-500 h-full transition-all duration-500" style={{ width: `${quality_scores?.validity ?? 0}%` }} />
               </div>
               <p className="text-[11px] text-slate-500">Parsed without schema errors or structural violations</p>
             </div>
@@ -237,11 +246,11 @@ export const DataProfilePage: React.FC = () => {
                   const col = column_profiles.find((c) => c.name === e.target.value);
                   if (col) setSelectedColumn(col);
                 }}
-                className="px-2.5 py-1 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-300 focus:outline-none"
+                className="px-2.5 py-1 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-300 focus:outline-none font-mono"
               >
                 {column_profiles.map((c) => (
                   <option key={c.name} value={c.name}>
-                    {c.name} ({c.data_type})
+                    {c.name} ({(c as any).detected_type || c.data_type})
                   </option>
                 ))}
               </select>
@@ -271,8 +280,14 @@ export const DataProfilePage: React.FC = () => {
                   </LineChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="text-center text-xs text-slate-500">
-                  Numeric column metrics: Min {selectedColumn?.min ?? 'N/A'}, Max {selectedColumn?.max ?? 'N/A'}, Mean {selectedColumn?.mean ?? 'N/A'}, Outliers: {selectedColumn?.outlier_count ?? 0}
+                <div className="text-center text-xs text-slate-400 font-mono space-y-2 p-4">
+                  <p className="text-indigo-300 font-bold">Numeric Outlier & IQR Statistics</p>
+                  <p>Min: {selectedColumn?.min ?? 'N/A'} | Max: {selectedColumn?.max ?? 'N/A'} | Mean: {selectedColumn?.mean ?? 'N/A'}</p>
+                  <p className="text-purple-300">Q1: {(selectedColumn as any)?.q1 ?? 'N/A'} | Q3: {(selectedColumn as any)?.q3 ?? 'N/A'} | IQR: {(selectedColumn as any)?.iqr ?? 'N/A'}</p>
+                  <p className="text-cyan-300">Lower Bound: {(selectedColumn as any)?.lower_bound ?? 'N/A'} | Upper Bound: {(selectedColumn as any)?.upper_bound ?? 'N/A'}</p>
+                  <p className={(selectedColumn?.outlier_count || 0) > 0 ? 'text-amber-400 font-bold' : 'text-slate-500'}>
+                    Potential Outliers: {selectedColumn?.outlier_count ?? 0} ({formatPercentage((selectedColumn as any)?.outlier_percentage)})
+                  </p>
                 </div>
               )}
             </div>
@@ -281,10 +296,13 @@ export const DataProfilePage: React.FC = () => {
 
         {/* Detailed Column Profiling Table */}
         <section className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-4">
-          <h2 className="text-lg font-semibold text-slate-200 flex items-center gap-2">
-            <Layers className="w-5 h-5 text-indigo-400" />
-            <span>Column Level Profiling Statistics</span>
-          </h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-slate-200 flex items-center gap-2">
+              <Layers className="w-5 h-5 text-indigo-400" />
+              <span>Column Level Profiling Statistics</span>
+            </h2>
+            <span className="text-xs text-slate-400 font-mono">Click any row for detailed IQR bounds & drilldown</span>
+          </div>
 
           <div className="overflow-x-auto border border-slate-800 rounded-xl">
             <table className="w-full text-left text-xs border-collapse font-mono">
@@ -308,25 +326,38 @@ export const DataProfilePage: React.FC = () => {
                       selectedColumn?.name === col.name ? 'bg-indigo-600/10' : ''
                     }`}
                   >
-                    <td className="py-3 px-4 font-semibold text-slate-200 font-sans">{col.name}</td>
+                    <td className="py-3 px-4 font-semibold text-indigo-300 font-sans flex items-center gap-2">
+                      <span>{col.name}</span>
+                      {selectedColumn?.name === col.name && <span className="text-[10px] text-indigo-400">🔍</span>}
+                    </td>
                     <td className="py-3 px-4">
-                      <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-indigo-300 text-[11px]">
-                        {col.data_type}
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${
+                        ((col as any).detected_type || col.data_type).includes('date')
+                          ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+                          : ((col as any).detected_type || col.data_type) === 'email'
+                          ? 'bg-cyan-500/10 text-cyan-300 border-cyan-500/30'
+                          : ((col as any).detected_type || col.data_type) === 'numeric' || col.min !== undefined
+                          ? 'bg-purple-500/10 text-purple-300 border-purple-500/30'
+                          : 'bg-slate-800 text-slate-400 border-slate-700'
+                      }`}>
+                        {(col as any).detected_type || col.data_type}
                       </span>
                     </td>
                     <td className="py-3 px-4">
-                      <span className={col.null_count > 0 ? 'text-rose-400' : 'text-slate-400'}>
-                        {col.null_count} ({col.null_percentage}%)
+                      <span className={col.null_count > 0 ? 'text-amber-400 font-bold' : 'text-slate-400'}>
+                        {formatNumber(col.null_count)} ({formatPercentage(col.null_percentage)})
                       </span>
                     </td>
                     <td className="py-3 px-4 text-slate-300">
-                      {col.unique_count} ({col.unique_percentage}%)
+                      {formatNumber(col.unique_count)} ({formatPercentage(col.unique_percentage)})
                     </td>
                     <td className="py-3 px-4 text-slate-400">
                       {col.min !== undefined && col.max !== undefined
                         ? `${col.min} / ${col.max}`
                         : col.min_date
                         ? `${col.min_date} .. ${col.max_date}`
+                        : (col as any).detected_format === 'email'
+                        ? `Format: Email`
                         : 'N/A'}
                     </td>
                     <td className="py-3 px-4 text-slate-400">
@@ -335,7 +366,7 @@ export const DataProfilePage: React.FC = () => {
                     <td className="py-3 px-4">
                       {col.outlier_count !== undefined ? (
                         <span className={col.outlier_count > 0 ? 'text-amber-400 font-bold' : 'text-slate-500'}>
-                          {col.outlier_count}
+                          {col.outlier_count} ({formatPercentage((col as any).outlier_percentage)})
                         </span>
                       ) : (
                         'N/A'
@@ -346,6 +377,158 @@ export const DataProfilePage: React.FC = () => {
               </tbody>
             </table>
           </div>
+        </section>
+
+        {/* Selected Column IQR & Anomaly Drilldown Card */}
+        {selectedColumn && (
+          <section className="glass-panel p-6 rounded-2xl border border-indigo-500/40 bg-slate-900/95 space-y-4 font-mono">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-3">
+                <Database className="w-5 h-5 text-indigo-400" />
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider">
+                  Column Inspector & IQR Bounds: <span className="text-indigo-300">{selectedColumn.name}</span>
+                </h3>
+              </div>
+              <span className="text-xs text-slate-400 uppercase bg-slate-950 px-3 py-1 rounded-lg border border-slate-800">
+                Data Type: {(selectedColumn as any).detected_type || selectedColumn.data_type}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+              <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800">
+                <span className="text-slate-500 uppercase text-[10px] block font-bold">NULL Freq / Count (%)</span>
+                <span className="text-amber-400 font-bold block mt-1">{formatNumber(selectedColumn.null_count)} ({formatPercentage(selectedColumn.null_percentage)})</span>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800">
+                <span className="text-slate-500 uppercase text-[10px] block font-bold">Unique Values (%)</span>
+                <span className="text-emerald-400 font-bold block mt-1">{formatNumber(selectedColumn.unique_count)} ({formatPercentage(selectedColumn.unique_percentage)})</span>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800">
+                <span className="text-slate-500 uppercase text-[10px] block font-bold">Completeness Ratio</span>
+                <span className="text-cyan-400 font-bold block mt-1">{formatPercentage((selectedColumn as any).completeness_percentage)}</span>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800">
+                <span className="text-slate-500 uppercase text-[10px] block font-bold">Duplicate Values</span>
+                <span className="text-slate-300 font-bold block mt-1">{formatNumber((selectedColumn as any).duplicate_value_count ?? 0)}</span>
+              </div>
+            </div>
+
+            {/* Numeric Quartiles & Outlier Bounds */}
+            {(selectedColumn.min !== undefined || (selectedColumn as any).detected_type === 'numeric') && (
+              <div className="p-4 rounded-xl bg-slate-950/90 border border-purple-500/30 space-y-3">
+                <span className="text-xs font-bold text-purple-300 uppercase tracking-wider block border-b border-slate-800 pb-2">
+                  IQR Quartiles & Statistical Outlier Analysis
+                </span>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
+                  <div>
+                    <span className="text-slate-500 text-[10px] block">Min / Max</span>
+                    <span className="text-white font-bold">{String(selectedColumn.min)} / {String(selectedColumn.max)}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 text-[10px] block">Mean / Median</span>
+                    <span className="text-white font-bold">{String(selectedColumn.mean)} / {String(selectedColumn.median)}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 text-[10px] block">Q1 (25th) / Q3 (75th)</span>
+                    <span className="text-purple-300 font-bold">{(selectedColumn as any).q1 ?? 'N/A'} / {(selectedColumn as any).q3 ?? 'N/A'}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 text-[10px] block">IQR Bounds</span>
+                    <span className="text-cyan-300 font-bold">[{(selectedColumn as any).lower_bound ?? 'N/A'}, {(selectedColumn as any).upper_bound ?? 'N/A'}]</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 text-[10px] block">Potential Outliers</span>
+                    <span className={`font-bold ${(selectedColumn.outlier_count || 0) > 0 ? 'text-amber-400' : 'text-slate-400'}`}>
+                      {formatNumber(selectedColumn.outlier_count)} ({formatPercentage((selectedColumn as any).outlier_percentage)})
+                    </span>
+                  </div>
+                </div>
+
+                {(selectedColumn as any).affected_row_indices && (selectedColumn as any).affected_row_indices.length > 0 && (
+                  <div className="pt-2 border-t border-slate-800/80 text-xs text-slate-300">
+                    <span className="text-amber-400 font-bold">Affected Row Indices: </span>
+                    <span className="font-mono bg-slate-900 px-2 py-0.5 rounded border border-slate-800 text-amber-300">
+                      [{(selectedColumn as any).affected_row_indices.join(', ')}]
+                    </span>
+                    {selectedColumn.outliers && (
+                      <span className="ml-3 text-slate-400">
+                        Sample Outliers: [{selectedColumn.outliers.join(', ')}]
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* Data Quality Issues & Anomaly Analysis Section */}
+        <section className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-4 font-mono">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <h2 className="text-base font-bold text-white uppercase tracking-wider flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-amber-400" />
+              <span>Data Quality Issues & Anomaly Summary</span>
+            </h2>
+            <span className="text-xs text-slate-400">
+              Total Issues Detected: <strong className="text-white">{qualityIssues.length}</strong>
+            </span>
+          </div>
+
+          {qualityIssues.length > 0 ? (
+            <div className="overflow-x-auto border border-slate-800 rounded-xl">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="bg-slate-900 border-b border-slate-800 text-slate-300 font-semibold">
+                  <tr>
+                    <th className="py-3 px-4">Severity</th>
+                    <th className="py-3 px-4">Category</th>
+                    <th className="py-3 px-4">Target Column</th>
+                    <th className="py-3 px-4">Count</th>
+                    <th className="py-3 px-4">Percentage</th>
+                    <th className="py-3 px-4">Description & Evidence</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60 text-slate-200">
+                  {qualityIssues.map((issue: any, idx: number) => (
+                    <tr key={idx} className="hover:bg-slate-800/40">
+                      <td className="py-3 px-4 font-bold">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${
+                          issue.severity === 'CRITICAL' || issue.severity === 'HIGH'
+                            ? 'bg-rose-500/10 text-rose-400 border-rose-500/30'
+                            : issue.severity === 'WARNING' || issue.severity === 'MEDIUM'
+                            ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                            : 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30'
+                        }`}>
+                          {issue.severity}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 font-bold text-indigo-300">{issue.category}</td>
+                      <td className="py-3 px-4 text-slate-300 font-bold">{issue.column}</td>
+                      <td className="py-3 px-4 text-white">{formatNumber(issue.count)}</td>
+                      <td className="py-3 px-4">
+                        <span className={(issue.percentage || 0) > 0 ? 'text-amber-400 font-bold' : 'text-slate-400'}>
+                          {formatPercentage(issue.percentage)}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-slate-300">
+                        <p className="font-semibold text-white">{issue.description}</p>
+                        {issue.evidence && issue.evidence.length > 0 && (
+                          <span className="text-[11px] text-slate-400 block mt-0.5">
+                            Evidence: {issue.evidence.join(' | ')}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="p-8 rounded-xl bg-slate-950/60 border border-slate-800 text-center space-y-2">
+              <CheckCircle2 className="w-8 h-8 text-emerald-400/80 mx-auto" />
+              <p className="text-sm font-bold text-white">Zero Critical Quality Anomalies</p>
+              <p className="text-xs text-slate-400">All columns fall within valid deterministic quality parameters.</p>
+            </div>
+          )}
         </section>
 
       </div>

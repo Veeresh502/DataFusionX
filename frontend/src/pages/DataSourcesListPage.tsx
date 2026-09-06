@@ -7,20 +7,21 @@ import { AddDataSourceModal } from '../components/AddDataSourceModal';
 import { 
   Database, 
   Plus, 
-  FileText, 
-  Globe, 
   Trash2, 
   Eye, 
   RefreshCw, 
   Search,
   Layers,
-  Activity
+  Activity,
+  ShieldAlert
 } from 'lucide-react';
+import { useToast } from '../components/Toast';
 
 
 
 export const DataSourcesListPage: React.FC = () => {
   const navigate = useNavigate();
+  const toast = useToast();
   const [sources, setSources] = useState<DataSource[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -36,8 +37,8 @@ export const DataSourcesListPage: React.FC = () => {
     try {
       const data = await dataSourceService.listSources();
       setSources(data);
-    } catch (err) {
-      console.error('Failed to fetch data sources', err);
+    } catch (err: any) {
+      toast.error('Failed to load data sources', err.response?.data?.detail || 'Unexpected error');
     } finally {
       setLoading(false);
     }
@@ -49,8 +50,9 @@ export const DataSourcesListPage: React.FC = () => {
     try {
       await dataSourceService.deleteSource(id);
       setSources((prev) => prev.filter((s) => s.id !== id));
+      toast.success('Data Source Deleted', 'Data source removed successfully');
     } catch (err: any) {
-      alert(err.response?.data?.detail || 'Failed to delete data source');
+      toast.error('Failed to delete data source', err.response?.data?.detail || 'Unexpected error');
     }
   };
 
@@ -61,38 +63,24 @@ export const DataSourcesListPage: React.FC = () => {
   const getTypeBadge = (type: string) => {
     switch (type) {
       case 'CSV':
+        return <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">CSV</span>;
       case 'EXCEL':
+        return <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-green-500/10 text-green-400 border border-green-500/20">EXCEL</span>;
       case 'JSON':
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[11px] font-medium font-mono">
-            <FileText className="w-3 h-3" /> {type}
-          </span>
-        );
+        return <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">JSON</span>;
       case 'REST_API':
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 text-[11px] font-medium font-mono">
-            <Globe className="w-3 h-3" /> REST API
-          </span>
-        );
+        return <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">REST</span>;
       case 'POSTGRESQL':
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20 text-[11px] font-medium font-mono">
-            <Database className="w-3 h-3" /> PostgreSQL
-          </span>
-        );
+        return <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">POSTGRES</span>;
       default:
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 text-[11px] font-medium font-mono">
-            {type}
-          </span>
-        );
+        return <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-400">{type}</span>;
     }
   };
 
-  const filteredSources = sources.filter((s) => {
-    const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          (s.description || '').toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesType = typeFilter === 'ALL' || s.type === typeFilter;
+  const filteredSources = sources.filter((source) => {
+    const matchesSearch = source.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (source.description && source.description.toLowerCase().includes(searchQuery.toLowerCase()));
+    const matchesType = typeFilter === 'ALL' || source.type === typeFilter;
     return matchesSearch && matchesType;
   });
 
@@ -100,8 +88,8 @@ export const DataSourcesListPage: React.FC = () => {
     <MainLayout>
       <div className="max-w-6xl mx-auto space-y-8">
         
-        {/* Page Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-800 pb-6">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-6">
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-white flex items-center gap-3">
               <Database className="w-8 h-8 text-indigo-400" />
@@ -111,13 +99,22 @@ export const DataSourcesListPage: React.FC = () => {
               Ingest and manage CSV, Excel, JSON datasets, REST endpoints, and PostgreSQL tables
             </p>
           </div>
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white font-medium text-sm shadow-lg shadow-indigo-600/20 transition-all"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Add Data Source</span>
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate('/data-quality')}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-cyan-500/20 transition-all"
+            >
+              <ShieldAlert className="w-4 h-4" />
+              <span>AI Data Quality →</span>
+            </button>
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white font-medium text-sm shadow-lg shadow-indigo-600/20 transition-all"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Data Source</span>
+            </button>
+          </div>
         </div>
 
         {/* Filters & Search */}
